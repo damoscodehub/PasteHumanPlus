@@ -10,7 +10,7 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
             .readText()
             .then((clipText) => {
                 console.log("content.js: Clipboard text read:", clipText); // Log clipboard text
-                emulateTyping(clipText, currentTypingSession, request.delayedStart);
+                emulateTyping(clipText, currentTypingSession, request.delayedStart, request.speedFactor || 1.0);
             });
     } else if (request.action === "stopTyping") {
         currentTypingSession = null; // Invalidate the current typing session
@@ -23,9 +23,10 @@ window.addEventListener("keydown", function () {
     console.log('content.js: Keydown event detected'); // Log keydown event
 });
 
-function emulateTyping(text, session, delayedStart) {
+function emulateTyping(text, session, delayedStart, speedFactor = 1.0) {
     const activeElement = document.activeElement;
-    console.log('content.js: Active element:', activeElement); // Log the active element
+    console.log('content.js: Active element:', activeElement);
+    console.log('content.js: Speed factor:', speedFactor); // Log the active element
 
     let i = 0;
 
@@ -49,10 +50,10 @@ function emulateTyping(text, session, delayedStart) {
                 // Attempt to insert the text using document.execCommand
                 document.execCommand("insertText", false, text[i++]);
 
-                let delay = Math.random() * (200 - 50) + 50;
+                let delay = (Math.random() * (200 - 50) + 50) / speedFactor;
 
                 if (Math.random() < 0.05) {
-                    delay += Math.random() * (700 - 200) + 200;
+                    delay += (Math.random() * (700 - 200) + 200) / speedFactor;
                 }
 
                 setTimeout(typeNextCharacter, delay);

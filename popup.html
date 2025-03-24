@@ -1,9 +1,7 @@
 <!DOCTYPE html>
 <html>
-
 <head>
-  <title>PasteHuman</title>
-  <link rel="stylesheet" type="text/css">
+  <title>PasteHumanPlus</title>
   <style>
     body {
       background-color: #EFEAE4;
@@ -11,19 +9,15 @@
       padding: 15px;
       width: 300px;
     }
-
     .logo {
       width: 300px;
       display: block;
       margin: 0 auto 20px;
     }
-
-    h1,
-    button {
+    h1, button {
       text-align: center;
       width: 100%;
     }
-
     button {
       background-color: #000000;
       border: none;
@@ -35,15 +29,47 @@
       margin: 4px auto;
       cursor: pointer;
     }
+    .speed-control {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 15px 0;
+    }
+    .speed-btn {
+      width: 30px;
+      height: 30px;
+      padding: 0;
+      font-size: 20px;
+      line-height: 30px;
+    }
+    .speed-value {
+      font-weight: bold;
+      min-width: 40px;
+      text-align: center;
+    }
+    .shortcuts-link {
+      display: block;
+      text-align: center;
+      margin-top: 15px;
+      color: #0066cc;
+      cursor: pointer;
+      text-decoration: underline;
+    }
   </style>
 </head>
-
 <body>
   <img src="PasteHuman_Logo.jpg" alt="Logo" class="logo">
-  <p>Right click on a textbox and select "Emulate typing" to paste clipboard contents as if typing.</p>
+  <p>Right click on a textbox and select ">" to paste clipboard contents as if typing.</p>
   <p>Alternatively, you can click the "Start typing" button and then click on the textbox within 5 seconds.</p>
+  
+  <div class="speed-control">
+    <button class="speed-btn" id="decreaseSpeed">-</button>
+    <span class="speed-value" id="speedValue">100%</span>
+    <button class="speed-btn" id="increaseSpeed">+</button>
+  </div>
+  
   <button id="startTyping">Start typing</button>
+  <a class="shortcuts-link" id="shortcutsLink">Configure Keyboard Shortcuts</a>
   <script src="popup.js"></script>
 </body>
-
 </html>

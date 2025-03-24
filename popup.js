@@ -1,17 +1,34 @@
-document.getElementById('startTyping').addEventListener('click', function() {
-  console.log("popup.js: Start typing button clicked");
+// Speed control (default is 100% - normal speed)
+let speedFactor = 1.0;
 
-  // Using a timeout function to delay the message being sent by 5 seconds
+document.getElementById('decreaseSpeed').addEventListener('click', function() {
+  speedFactor = Math.max(0.2, speedFactor - 0.1); // Minimum 20% speed
+  updateSpeedDisplay();
+});
+
+document.getElementById('increaseSpeed').addEventListener('click', function() {
+  speedFactor = Math.min(2.0, speedFactor + 0.1); // Maximum 200% speed
+  updateSpeedDisplay();
+});
+
+function updateSpeedDisplay() {
+  document.getElementById('speedValue').textContent = `${Math.round(speedFactor * 100)}%`;
+}
+
+// Shortcuts link
+document.getElementById('shortcutsLink').addEventListener('click', function() {
+  chrome.tabs.create({url: 'chrome://extensions/shortcuts'});
+});
+
+// Start typing button
+document.getElementById('startTyping').addEventListener('click', function() {
   setTimeout(function() {
-      chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-          var currentTab = tabs[0]; // There should be only one in this array
-          console.log(`popup.js: Sending message to tab ${currentTab.id}`);
-          chrome.tabs.sendMessage(currentTab.id, {
-              action: 'emulateTyping',
-              delayedStart: true,
-          }, function(response) {
-              console.log("popup.js: Message sent: emulateTyping");
-          });
+    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+      chrome.tabs.sendMessage(tabs[0].id, {
+        action: 'emulateTyping',
+        delayedStart: true,
+        speedFactor: speedFactor
       });
-  }, 5000); // 5000 milliseconds (5 seconds) delay
+    });
+  }, 5000);
 });
