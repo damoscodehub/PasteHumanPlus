@@ -36,10 +36,17 @@
     },
     "stop_typing": {
       "suggested_key": {
-        "default": "Ctrl+Shift+.",
-        "mac": "Command+Shift+."
+        "default": "Alt+Shift+X",
+        "mac": "Alt+Shift+X"
       },
       "description": "Stop typing emulation"
+    },
+    "toggle_typing": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+X",
+        "mac": "Command+Shift+X"
+      },
+      "description": "Toggle pause/resume typing"
     }
   }
 }
