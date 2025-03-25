@@ -3,15 +3,27 @@ let isPaused = false;
 let remainingText = "";
 let currentSpeedFactor = 1.0;
 
+// Load speed factor from chrome.storage.local when script initializes
+chrome.storage.local.get(['speedFactor'], function(result) {
+  if (result.speedFactor !== undefined) {
+    currentSpeedFactor = result.speedFactor;
+  }
+});
+
 chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
     console.log('content.js: Message received:', request.action);
 
-    if (request.action === "emulateTyping") {
+    if (request.action === "updateSpeedFactor") {
+        currentSpeedFactor = request.speedFactor;
+        console.log(`content.js: Speed factor updated to ${currentSpeedFactor}`);
+    } else if (request.action === "emulateTyping") {
         // Always reset the state when starting a new typing session
         currentTypingSession = Math.random().toString();
         isPaused = false;
         remainingText = "";
-        currentSpeedFactor = request.speedFactor || 1.0;
+        
+        // Use speed factor from request if provided, otherwise use stored speed factor
+        currentSpeedFactor = request.speedFactor || currentSpeedFactor;
 
         console.log("content.js: Action received: emulateTyping");
         navigator.clipboard
@@ -19,6 +31,9 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
             .then((clipText) => {
                 console.log("content.js: Clipboard text read:", clipText);
                 emulateTyping(clipText, currentTypingSession, request.delayedStart, currentSpeedFactor);
+            })
+            .catch((err) => {
+                console.error("Failed to read clipboard:", err);
             });
     } else if (request.action === "stopTyping") {
         console.log("content.js: Stopping typing session");
