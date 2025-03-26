@@ -38,12 +38,6 @@
       margin: 0 auto 10px;
     }
 
-    .header {
-      text-align: center;
-      margin-bottom: 15px;
-      padding-top: 10px;
-    }    
-
     .section {
       margin-bottom: 8px;
       padding-bottom: 10px;
@@ -57,19 +51,19 @@
       font-size: 14px;
     }
 
-    .speed-control {
+    .speed-control, .randomness-control {
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
 
-    .speed-input-container {
+    .speed-input-container, .randomness-input-container {
       display: flex;
       align-items: center;
       justify-content: center;
     }
 
-    .speed-input {
+    .speed-input, .randomness-input {
       width: 50px;
       text-align: center;
       padding: 5px;
@@ -78,7 +72,7 @@
       margin-right: 5px;
     }
 
-    .speed-btn {
+    .speed-btn, .randomness-btn {
       width: 30px;
       height: 30px;
       border: none;
@@ -90,11 +84,11 @@
       transition: background-color 0.2s;
     }
 
-    .speed-btn:hover {
+    .speed-btn:hover, .randomness-btn:hover {
       background-color: #2980b9;
     }
 
-    .speed-slider {
+    .speed-slider, .randomness-slider {
       width: 100%;
       margin: 15px 0;
     }
@@ -105,6 +99,7 @@
       border-radius: 4px;
       font-size: 13px;
       line-height: 1.4;
+      margin: 5px 0;
     }
 
     .shortcut-value {
@@ -133,6 +128,7 @@
     .instructions {
       font-size: 13px;
       line-height: 1.4;
+      margin-bottom: 10px;
     }
 
     /* Modal styles */
@@ -172,10 +168,6 @@
       font-weight: bold;
       margin-bottom: 15px;
       color: var(--primary-color);
-    }
-
-    .menu-item:hover {
-      background-color: var(--highlight-color);
     }
 
     .modal-buttons {
@@ -222,7 +214,13 @@
       outline: none;
       border-color: var(--secondary-color);
       box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
-    }    
+    }
+
+    .info-text {
+      color: #a0a0a0;
+      font-size: 11px;
+      margin: 4px 0;
+    }
   </style>
 </head>
 <body>
@@ -244,54 +242,56 @@
   </div>
 
   <div class="section">
-    <div class="section-title">Use with Shortcuts</div>
-    <div class="shortcut-item">
-      <span>Deactivate/activate extension:</span>
-      <span class="shortcut-value" id="activateValue"></span>
-    </div>    
-    <div class="shortcut-item" style="margin-bottom: 2px; margin-top: 4px; color:#a0a0a0; font-size: 8;">
-      <span>► Set the cursor in any text field.</span>
+    <div class="section-title">Randomness of Delay</div>
+    <div class="randomness-control">
+      <button class="randomness-btn" id="decreaseRandomness">-</button>
+      <div class="randomness-input-container">
+        <input type="number" class="randomness-input" id="randomnessInput" min="10" max="200">
+        <span>%</span>
+      </div>
+      <button class="randomness-btn" id="increaseRandomness">+</button>
     </div>
-    <div class="shortcut-item">
-      <span>Start typing:</span>
-      <span class="shortcut-value" id="startValue"></span>
-    </div>
-    <div class="shortcut-item">
-      <span>Pause/resume:</span>
-      <span class="shortcut-value" id="toggleValue"></span>
-    </div>    
-    <div class="shortcut-item">
-      <span>Stop typing:</span>
-      <span class="shortcut-value" id="stopValue"></span>
-    </div> 
-    <button class="action-btn" id="changeShortcutsBtn">Change shortcuts</button>
+    <input type="range" class="randomness-slider" id="randomnessSlider" min="10" max="200" value="100">
+  </div>
+
+  <div class="section">
+    <button class="action-btn" id="shortcutsBtn">Keboard Shortcuts</button>
   </div>
 
   <div class="section" style="border-bottom: none;">
-    <div class="section-title">Use with Secondary Click</div>
-    <div class="instructions">
-      1. Right-click on any text field<br>
-      2. Select "<span id="mainMenuDisplay">v</span>" from the menu<br>
-      3. Choose your action: <br>
-      &nbsp;&nbsp;&nbsp;<span id="startMenuDisplay">></span> to start typing<br>
-      &nbsp;&nbsp;&nbsp;<span id="toggleMenuDisplay">╠</span> to toggle pause/resume<br>
-      &nbsp;&nbsp;&nbsp;<span id="stopMenuDisplay">.</span> to stop
-    </div>
-    <button class="action-btn" id="changeMenuStringsBtn">Change menu strings</button>
+    <button class="action-btn" id="secondaryClickBtn">Use with Secondary Click</button>
   </div>
 
-  <!-- Shortcuts Help Modal -->
+  <!-- Shortcuts Modal -->
   <div id="shortcutsModal" class="modal">
     <div class="modal-content">
-      <div class="modal-title">Change Shortcuts</div>
+      <div class="modal-title">Shortcuts</div>
+      <div class="shortcut-item">
+        <span>Deactivate/activate extension:</span>
+        <span class="shortcut-value" id="activateValue"></span>
+      </div>    
+      <div class="info-text">► Set the cursor in any text field.</div>
+      <div class="shortcut-item">
+        <span>Start typing:</span>
+        <span class="shortcut-value" id="startValue"></span>
+      </div>
+      <div class="shortcut-item">
+        <span>Pause/resume:</span>
+        <span class="shortcut-value" id="toggleValue"></span>
+      </div>    
+      <div class="shortcut-item">
+        <span>Stop typing:</span>
+        <span class="shortcut-value" id="stopValue"></span>
+      </div>
       <p>To change the shortcuts, find them in the <b>PasteHumanPlus</b> section <a href="#" id="shortcutsLink">here</a>.</p>
     </div>
   </div>
 
-  <!-- Menu Strings Modal -->
+  <!-- Secondary Click Modal -->
   <div id="menuStringsModal" class="modal">
     <div class="modal-content">
-      <div class="modal-title">Change Menu Strings</div>
+      <div class="modal-title">Use with Secondary Click</div>
+      <div class="instructions">Right-click on any text field and use the following options (you can change them here):</div>
       
       <div class="menu-string-container">
         <div class="menu-string-label">Main secondary click menu:</div>

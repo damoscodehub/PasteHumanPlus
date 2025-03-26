@@ -1,5 +1,6 @@
-// Default speed
+// Default values
 let speedFactor = 1.0;
+let randomnessFactor = 1.0;
 let menuStrings = {
   main: "v",
   start: ">",
@@ -13,12 +14,16 @@ const elements = {
   speedSlider: document.getElementById('speedSlider'),
   decreaseSpeed: document.getElementById('decreaseSpeed'),
   increaseSpeed: document.getElementById('increaseSpeed'),
+  randomnessInput: document.getElementById('randomnessInput'),
+  randomnessSlider: document.getElementById('randomnessSlider'),
+  decreaseRandomness: document.getElementById('decreaseRandomness'),
+  increaseRandomness: document.getElementById('increaseRandomness'),
   activateValue: document.getElementById('activateValue'),
   startValue: document.getElementById('startValue'),
   stopValue: document.getElementById('stopValue'),
   toggleValue: document.getElementById('toggleValue'),
-  changeShortcutsBtn: document.getElementById('changeShortcutsBtn'),
-  changeMenuStringsBtn: document.getElementById('changeMenuStringsBtn'),
+  shortcutsBtn: document.getElementById('shortcutsBtn'),
+  secondaryClickBtn: document.getElementById('secondaryClickBtn'),
   mainMenuDisplay: document.getElementById('mainMenuDisplay'),
   startMenuDisplay: document.getElementById('startMenuDisplay'),
   toggleMenuDisplay: document.getElementById('toggleMenuDisplay'),
@@ -51,18 +56,25 @@ function hideModal(modal) {
 
 // Initialize the popup
 document.addEventListener('DOMContentLoaded', function() {
-  loadSpeedFactor();
-  loadShortcuts();
-  loadMenuStrings();
+  loadSettings();
   setupEventListeners();
 });
 
-function loadSpeedFactor() {
-  chrome.storage.local.get(['speedFactor'], function(result) {
+function loadSettings() {
+  chrome.storage.local.get(['speedFactor', 'randomnessFactor', 'menuStrings'], function(result) {
     if (result.speedFactor !== undefined) {
       speedFactor = result.speedFactor;
     }
+    if (result.randomnessFactor !== undefined) {
+      randomnessFactor = result.randomnessFactor;
+    }
+    if (result.menuStrings) {
+      menuStrings = result.menuStrings;
+    }
     updateSpeedDisplay();
+    updateRandomnessDisplay();
+    updateContextMenuInstructions();
+    loadShortcuts();
   });
 }
 
@@ -87,15 +99,6 @@ function loadShortcuts() {
   });
 }
 
-function loadMenuStrings() {
-  chrome.storage.local.get(['menuStrings'], function(result) {
-    if (result.menuStrings) {
-      menuStrings = result.menuStrings;
-    }
-    updateContextMenuInstructions();
-  });
-}
-
 function setupEventListeners() {
   // Speed controls
   elements.decreaseSpeed.addEventListener('click', decreaseSpeed);
@@ -103,24 +106,27 @@ function setupEventListeners() {
   elements.speedInput.addEventListener('change', handleSpeedInputChange);
   elements.speedSlider.addEventListener('input', handleSpeedSliderChange);
   
+  // Randomness controls
+  elements.decreaseRandomness.addEventListener('click', decreaseRandomness);
+  elements.increaseRandomness.addEventListener('click', increaseRandomness);
+  elements.randomnessInput.addEventListener('change', handleRandomnessInputChange);
+  elements.randomnessSlider.addEventListener('input', handleRandomnessSliderChange);
+  
   // Shortcuts button
-  elements.changeShortcutsBtn.addEventListener('click', function() {
+  elements.shortcutsBtn.addEventListener('click', function() {
     showModal(elements.shortcutsModal);
   });
   
-  // Menu strings button
-  elements.changeMenuStringsBtn.addEventListener('click', function() {
-    // Initialize inputs with current values
+  // Secondary click button
+  elements.secondaryClickBtn.addEventListener('click', function() {
     elements.mainMenuInput.value = menuStrings.main;
     elements.startMenuInput.value = menuStrings.start;
     elements.toggleMenuInput.value = menuStrings.toggle;
     elements.stopMenuInput.value = menuStrings.stop;
-    
     showModal(elements.menuStringsModal);
   });
   
-  
-  // Modal close handlers
+  // Shortcuts link
   elements.shortcutsLink.addEventListener('click', function(e) {
     e.preventDefault();
     chrome.tabs.create({url: 'chrome://extensions/shortcuts'});
@@ -172,41 +178,33 @@ function updateContextMenu() {
   });
 }
 
+// Speed control functions
 function decreaseSpeed() {
   let value = Math.max(10, Math.floor(speedFactor * 100));
-  
   if (value % 10 === 0 && value > 10) {
     value -= 10;
   } else {
     value = Math.floor(value / 10) * 10;
   }
-  
   speedFactor = value / 100;
   saveSpeedFactor();
 }
 
 function increaseSpeed() {
   let value = Math.min(200, Math.floor(speedFactor * 100));
-  
   if (value % 10 === 0 && value < 200) {
     value += 10;
   } else {
     value = Math.ceil(value / 10) * 10;
   }
-  
   speedFactor = value / 100;
   saveSpeedFactor();
 }
 
 function handleSpeedInputChange() {
   let value = parseInt(elements.speedInput.value);
-  
-  if (isNaN(value)) {
-    value = 100;
-  } else {
-    value = Math.max(10, Math.min(200, value));
-  }
-  
+  if (isNaN(value)) value = 100;
+  value = Math.max(10, Math.min(200, value));
   speedFactor = value / 100;
   saveSpeedFactor();
 }
@@ -220,13 +218,10 @@ function handleSpeedSliderChange() {
 function saveSpeedFactor() {
   chrome.storage.local.set({speedFactor: speedFactor}, function() {
     updateSpeedDisplay();
-    // Broadcast speed change to all tabs
-    chrome.tabs.query({}, function(tabs) {
-      tabs.forEach(function(tab) {
-        chrome.tabs.sendMessage(tab.id, {
-          action: 'updateSpeedFactor',
-          speedFactor: speedFactor
-        });
+    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+      chrome.tabs.sendMessage(tabs[0].id, {
+        action: 'updateSpeedFactor',
+        speedFactor: speedFactor
       });
     });
   });
@@ -236,4 +231,59 @@ function updateSpeedDisplay() {
   const value = Math.round(speedFactor * 100);
   elements.speedInput.value = value;
   elements.speedSlider.value = value;
+}
+
+// Randomness control functions
+function decreaseRandomness() {
+  let value = Math.max(10, Math.floor(randomnessFactor * 100));
+  if (value % 10 === 0 && value > 10) {
+    value -= 10;
+  } else {
+    value = Math.floor(value / 10) * 10;
+  }
+  randomnessFactor = value / 100;
+  saveRandomnessFactor();
+}
+
+function increaseRandomness() {
+  let value = Math.min(200, Math.floor(randomnessFactor * 100));
+  if (value % 10 === 0 && value < 200) {
+    value += 10;
+  } else {
+    value = Math.ceil(value / 10) * 10;
+  }
+  randomnessFactor = value / 100;
+  saveRandomnessFactor();
+}
+
+function handleRandomnessInputChange() {
+  let value = parseInt(elements.randomnessInput.value);
+  if (isNaN(value)) value = 100;
+  value = Math.max(10, Math.min(200, value));
+  randomnessFactor = value / 100;
+  saveRandomnessFactor();
+}
+
+function handleRandomnessSliderChange() {
+  randomnessFactor = parseInt(elements.randomnessSlider.value) / 100;
+  updateRandomnessDisplay();
+  saveRandomnessFactor();
+}
+
+function saveRandomnessFactor() {
+  chrome.storage.local.set({randomnessFactor: randomnessFactor}, function() {
+    updateRandomnessDisplay();
+    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+      chrome.tabs.sendMessage(tabs[0].id, {
+        action: 'updateRandomnessFactor',
+        randomnessFactor: randomnessFactor
+      });
+    });
+  });
+}
+
+function updateRandomnessDisplay() {
+  const value = Math.round(randomnessFactor * 100);
+  elements.randomnessInput.value = value;
+  elements.randomnessSlider.value = value;
 }

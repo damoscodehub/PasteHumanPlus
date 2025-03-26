@@ -2,11 +2,15 @@ let currentTypingSession = null;
 let isPaused = false;
 let remainingText = "";
 let currentSpeedFactor = 1.0;
+let currentRandomnessFactor = 1.0;
 
-// Load speed factor from chrome.storage.local when script initializes
-chrome.storage.local.get(['speedFactor'], function(result) {
+// Load settings from chrome.storage.local when script initializes
+chrome.storage.local.get(['speedFactor', 'randomnessFactor'], function(result) {
   if (result.speedFactor !== undefined) {
     currentSpeedFactor = result.speedFactor;
+  }
+  if (result.randomnessFactor !== undefined) {
+    currentRandomnessFactor = result.randomnessFactor;
   }
 });
 
@@ -16,6 +20,9 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
     if (request.action === "updateSpeedFactor") {
         currentSpeedFactor = request.speedFactor;
         console.log(`content.js: Speed factor updated to ${currentSpeedFactor}`);
+    } else if (request.action === "updateRandomnessFactor") {
+        currentRandomnessFactor = request.randomnessFactor;
+        console.log(`content.js: Randomness factor updated to ${currentRandomnessFactor}`);
     } else if (request.action === "emulateTyping") {
         // Always reset the state when starting a new typing session
         currentTypingSession = Math.random().toString();
@@ -24,13 +31,14 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
         
         // Use speed factor from request if provided, otherwise use stored speed factor
         currentSpeedFactor = request.speedFactor || currentSpeedFactor;
+        currentRandomnessFactor = request.randomnessFactor || currentRandomnessFactor;
 
         console.log("content.js: Action received: emulateTyping");
         navigator.clipboard
             .readText()
             .then((clipText) => {
                 console.log("content.js: Clipboard text read:", clipText);
-                emulateTyping(clipText, currentTypingSession, request.delayedStart, currentSpeedFactor);
+                emulateTyping(clipText, currentTypingSession, request.delayedStart, currentSpeedFactor, currentRandomnessFactor);
             })
             .catch((err) => {
                 console.error("Failed to read clipboard:", err);
@@ -46,7 +54,7 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
             console.log(`content.js: Typing ${isPaused ? 'paused' : 'resumed'}`);
             if (!isPaused && remainingText) {
                 console.log("content.js: Resuming typing with remaining text");
-                emulateTyping(remainingText, currentTypingSession, false, currentSpeedFactor);
+                emulateTyping(remainingText, currentTypingSession, false, currentSpeedFactor, currentRandomnessFactor);
                 remainingText = "";
             }
         }
@@ -62,10 +70,11 @@ window.addEventListener("keydown", function (event) {
     }
 });
 
-function emulateTyping(text, session, delayedStart, speedFactor = 1.0) {
+function emulateTyping(text, session, delayedStart, speedFactor = 1.0, randomnessFactor = 1.0) {
     const activeElement = document.activeElement;
     console.log('content.js: Active element:', activeElement);
     console.log('content.js: Speed factor:', speedFactor);
+    console.log('content.js: Randomness factor:', randomnessFactor);
 
     let i = 0;
 
@@ -91,10 +100,18 @@ function emulateTyping(text, session, delayedStart, speedFactor = 1.0) {
                 activeElement.dispatchEvent(event);
                 document.execCommand("insertText", false, text[i++]);
 
-                let delay = (Math.random() * (100 - 30) + 30) / speedFactor;
+                // Calculate base delay with speed factor
+                let baseDelay = (Math.random() * (100 - 30) + 30) / speedFactor;
+                
+                // Apply randomness factor (1.0 = normal, <1.0 = less random, >1.0 = more random)
+                let randomMultiplier = 0.8 + (Math.random() * 0.4); // Base range 0.8-1.2
+                randomMultiplier = 1 + (randomMultiplier - 1) * randomnessFactor; // Scale by randomnessFactor
+                
+                let delay = baseDelay * randomMultiplier;
 
+                // Occasionally add longer pauses
                 if (Math.random() < 0.05) {
-                  delay += (Math.random() * (400 - 100) + 100) / speedFactor;
+                    delay += (Math.random() * (400 - 100) + 100) / speedFactor;
                 }
 
                 setTimeout(typeNextCharacter, delay);
