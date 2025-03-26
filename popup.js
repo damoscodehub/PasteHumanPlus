@@ -1,5 +1,5 @@
-// Default speed (130% instead of 100% for faster default)
-let speedFactor = 1.3;
+// Default speed
+let speedFactor = 1.0;
 let menuStrings = {
   main: "v",
   start: ">",
@@ -19,7 +19,10 @@ const elements = {
   toggleValue: document.getElementById('toggleValue'),
   changeShortcutsBtn: document.getElementById('changeShortcutsBtn'),
   changeMenuStringsBtn: document.getElementById('changeMenuStringsBtn'),
-  contextMenuInstructions: document.getElementById('contextMenuInstructions'),
+  mainMenuDisplay: document.getElementById('mainMenuDisplay'),
+  startMenuDisplay: document.getElementById('startMenuDisplay'),
+  toggleMenuDisplay: document.getElementById('toggleMenuDisplay'),
+  stopMenuDisplay: document.getElementById('stopMenuDisplay'),
   shortcutsModal: document.getElementById('shortcutsModal'),
   menuStringsModal: document.getElementById('menuStringsModal'),
   mainMenuInput: document.getElementById('mainMenuInput'),
@@ -28,12 +31,23 @@ const elements = {
   stopMenuInput: document.getElementById('stopMenuInput'),
   cancelMenuStringsBtn: document.getElementById('cancelMenuStringsBtn'),
   applyMenuStringsBtn: document.getElementById('applyMenuStringsBtn'),
-  shortcutsLink: document.getElementById('shortcutsLink'),
-  mainMenuDisplay: document.getElementById('mainMenuDisplay'),
-  startMenuDisplay: document.getElementById('startMenuDisplay'),
-  toggleMenuDisplay: document.getElementById('toggleMenuDisplay'),
-  stopMenuDisplay: document.getElementById('stopMenuDisplay')  
+  shortcutsLink: document.getElementById('shortcutsLink')
 };
+
+// Helper functions for modal animations
+function showModal(modal) {
+  modal.style.display = 'flex';
+  setTimeout(() => {
+    modal.classList.add('show');
+  }, 10);
+}
+
+function hideModal(modal) {
+  modal.classList.remove('show');
+  setTimeout(() => {
+    modal.style.display = 'none';
+  }, 150);
+}
 
 // Initialize the popup
 document.addEventListener('DOMContentLoaded', function() {
@@ -41,7 +55,6 @@ document.addEventListener('DOMContentLoaded', function() {
   loadShortcuts();
   loadMenuStrings();
   setupEventListeners();
-  updateContextMenuInstructions();
 });
 
 function loadSpeedFactor() {
@@ -92,40 +105,31 @@ function setupEventListeners() {
   
   // Shortcuts button
   elements.changeShortcutsBtn.addEventListener('click', function() {
-    elements.shortcutsModal.style.display = 'block';
+    showModal(elements.shortcutsModal);
   });
   
   // Menu strings button
   elements.changeMenuStringsBtn.addEventListener('click', function() {
-    // Load current values into modal inputs
+    // Initialize inputs with current values
     elements.mainMenuInput.value = menuStrings.main;
     elements.startMenuInput.value = menuStrings.start;
     elements.toggleMenuInput.value = menuStrings.toggle;
     elements.stopMenuInput.value = menuStrings.stop;
     
-    elements.menuStringsModal.style.display = 'block';
+    showModal(elements.menuStringsModal);
   });
+  
   
   // Modal close handlers
   elements.shortcutsLink.addEventListener('click', function(e) {
     e.preventDefault();
     chrome.tabs.create({url: 'chrome://extensions/shortcuts'});
-    elements.shortcutsModal.style.display = 'none';
-  });
-  
-  // Close modals when clicking outside
-  window.addEventListener('click', function(event) {
-    if (event.target === elements.shortcutsModal) {
-      elements.shortcutsModal.style.display = 'none';
-    }
-    if (event.target === elements.menuStringsModal) {
-      elements.menuStringsModal.style.display = 'none';
-    }
+    hideModal(elements.shortcutsModal);
   });
   
   // Menu strings modal buttons
   elements.cancelMenuStringsBtn.addEventListener('click', function() {
-    elements.menuStringsModal.style.display = 'none';
+    hideModal(elements.menuStringsModal);
   });
   
   elements.applyMenuStringsBtn.addEventListener('click', function() {
@@ -139,8 +143,18 @@ function setupEventListeners() {
     chrome.storage.local.set({menuStrings: menuStrings}, function() {
       updateContextMenuInstructions();
       updateContextMenu();
-      elements.menuStringsModal.style.display = 'none';
+      hideModal(elements.menuStringsModal);
     });
+  });
+  
+  // Close modals when clicking outside
+  window.addEventListener('click', function(event) {
+    if (event.target === elements.shortcutsModal) {
+      hideModal(elements.shortcutsModal);
+    }
+    if (event.target === elements.menuStringsModal) {
+      hideModal(elements.menuStringsModal);
+    }
   });
 }
 

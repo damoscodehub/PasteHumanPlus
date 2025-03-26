@@ -43,15 +43,15 @@
     },
     "stop_typing": {
       "suggested_key": {
-        "default": "Alt+X",
-        "mac": "Alt+X"
+        "default": "Alt+T",
+        "mac": "Alt+T"
       },
       "description": "Stop typing emulation"
     },
     "toggle_typing": {
       "suggested_key": {
-        "default": "Alt+T",
-        "mac": "Alt+T"
+        "default": "Alt+X",
+        "mac": "Alt+X"
       },
       "description": "Toggle pause/resume typing"
     }

@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <title>PasteHumanPlus</title>
   <style>
     :root {
@@ -18,6 +19,7 @@
       padding: 15px;
       width: 220px;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      -webkit-font-smoothing: antialiased;
       margin: 0;
     }
 
@@ -29,11 +31,18 @@
       font-weight: bold;
     }
 
-    .logo {
-      width: 250px;
+    .logo-image {
+      width: 100%;
+      height: auto;
       display: block;
-      margin: 0 auto 15px;
+      margin: 0 auto 10px;
     }
+
+    .header {
+      text-align: center;
+      margin-bottom: 15px;
+      padding-top: 10px;
+    }    
 
     .section {
       margin-bottom: 8px;
@@ -136,16 +145,27 @@
       width: 100%;
       height: 100%;
       background-color: rgba(0,0,0,0.4);
+      align-items: center;
+      justify-content: center;
     }
 
     .modal-content {
       background-color: var(--background-color);
-      margin: 15% auto;
       padding: 20px;
       border: 1px solid var(--border-color);
-      width: 80%;
-      max-width: 300px;
+      width: 90%;
+      max-width: 280px;
       border-radius: 5px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      transform: scale(0.95);
+      transition: transform 0.15s ease-out;
+      opacity: 0;
+      transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+    }
+
+    .modal.show .modal-content {
+      transform: scale(1);
+      opacity: 1;
     }
 
     .modal-title {
@@ -154,20 +174,8 @@
       color: var(--primary-color);
     }
 
-    .menu-item {
-      margin: 10px 0;
-      padding: 5px;
-      cursor: pointer;
-    }
-
     .menu-item:hover {
       background-color: var(--highlight-color);
-    }
-
-    .menu-item-input {
-      width: 30px;
-      text-align: center;
-      margin-left: 10px;
     }
 
     .modal-buttons {
@@ -191,10 +199,36 @@
       background-color: var(--secondary-color);
       color: white;
     }
+
+    .menu-string-container {
+      margin: 15px 0;
+    }
+
+    .menu-string-label {
+      font-size: 14px;
+      margin-bottom: 5px;
+      color: var(--primary-color);
+    }
+
+    .menu-string-input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      font-family: inherit;
+    }
+
+    .menu-string-input:focus {
+      outline: none;
+      border-color: var(--secondary-color);
+      box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+    }    
   </style>
 </head>
 <body>
-  <div class="header">PasteHumanPlus</div>
+  <div class="header">
+    <img src="PasteHumanPlus_isologo.png" alt="PasteHumanPlus Logo" class="logo-image">
+  </div>
 
   <div class="section">
     <div class="section-title">Typing Speed</div>
@@ -211,8 +245,12 @@
 
   <div class="section">
     <div class="section-title">Use with Shortcuts</div>
+    <div class="shortcut-item">
+      <span>Deactivate/activate extension:</span>
+      <span class="shortcut-value" id="activateValue"></span>
+    </div>    
     <div class="shortcut-item" style="margin-bottom: 2px; margin-top: 4px; color:#a0a0a0; font-size: 8;">
-      <span>► Set the cursor in any text field</span>
+      <span>► Set the cursor in any text field.</span>
     </div>
     <div class="shortcut-item">
       <span>Start typing:</span>
@@ -225,14 +263,7 @@
     <div class="shortcut-item">
       <span>Stop typing:</span>
       <span class="shortcut-value" id="stopValue"></span>
-    </div>
-    <div class="shortcut-item" style="margin-bottom: 2px; margin-top: 4px; color:#a0a0a0; font-size: 8;">
-      <span>► The extension is activate by default</span>
-    </div>
-    <div class="shortcut-item">
-      <span>Deactivate/activate extension:</span>
-      <span class="shortcut-value" id="activateValue"></span>
-    </div>    
+    </div> 
     <button class="action-btn" id="changeShortcutsBtn">Change shortcuts</button>
   </div>
 
@@ -261,18 +292,27 @@
   <div id="menuStringsModal" class="modal">
     <div class="modal-content">
       <div class="modal-title">Change Menu Strings</div>
-      <div class="menu-item">
-        Main secondary click menu: <input type="text" class="menu-item-input" id="mainMenuInput" maxlength="1">
+      
+      <div class="menu-string-container">
+        <div class="menu-string-label">Main secondary click menu:</div>
+        <input type="text" class="menu-string-input" id="mainMenuInput">
       </div>
-      <div class="menu-item">
-        Start typing: <input type="text" class="menu-item-input" id="startMenuInput" maxlength="1">
+      
+      <div class="menu-string-container">
+        <div class="menu-string-label">Start typing:</div>
+        <input type="text" class="menu-string-input" id="startMenuInput">
       </div>
-      <div class="menu-item">
-        Toggle pause/resume: <input type="text" class="menu-item-input" id="toggleMenuInput" maxlength="1">
+      
+      <div class="menu-string-container">
+        <div class="menu-string-label">Toggle pause/resume:</div>
+        <input type="text" class="menu-string-input" id="toggleMenuInput">
       </div>
-      <div class="menu-item">
-        Stop: <input type="text" class="menu-item-input" id="stopMenuInput" maxlength="1">
+      
+      <div class="menu-string-container">
+        <div class="menu-string-label">Stop:</div>
+        <input type="text" class="menu-string-input" id="stopMenuInput">
       </div>
+      
       <div class="modal-buttons">
         <button class="modal-btn modal-btn-cancel" id="cancelMenuStringsBtn">Cancel</button>
         <button class="modal-btn modal-btn-apply" id="applyMenuStringsBtn">Apply</button>
