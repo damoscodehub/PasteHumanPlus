@@ -77,6 +77,7 @@ function emulateTyping(text, session, delayedStart, speedFactor = 1.0, randomnes
     console.log('content.js: Randomness factor:', randomnessFactor);
 
     let i = 0;
+    const baseDelay = 65 / speedFactor; // Average delay in milliseconds
 
     const startTyping = function () {
         function typeNextCharacter() {
@@ -100,18 +101,29 @@ function emulateTyping(text, session, delayedStart, speedFactor = 1.0, randomnes
                 activeElement.dispatchEvent(event);
                 document.execCommand("insertText", false, text[i++]);
 
-                // Calculate base delay with speed factor
-                let baseDelay = (Math.random() * (100 - 30) + 30) / speedFactor;
+                let delay;
                 
-                // Apply randomness factor (1.0 = normal, <1.0 = less random, >1.0 = more random)
-                let randomMultiplier = 0.8 + (Math.random() * 0.4); // Base range 0.8-1.2
-                randomMultiplier = 1 + (randomMultiplier - 1) * randomnessFactor; // Scale by randomnessFactor
-                
-                let delay = baseDelay * randomMultiplier;
+                if (randomnessFactor <= 0) {
+                    // 0% randomness - perfectly consistent timing
+                    delay = baseDelay;
+                } else {
+                    // Calculate random delay while maintaining same average speed
+                    const variationScale = Math.min(2, randomnessFactor); // Cap at 200%
+                    const minDelay = baseDelay * Math.max(0.5, 1 - 0.5 * variationScale);
+                    const maxDelay = baseDelay * (1 + 0.5 * variationScale);
+                    
+                    // Base random delay within calculated range
+                    delay = minDelay + Math.random() * (maxDelay - minDelay);
+                    
+                    // For high randomness (100%+), add occasional extreme delays
+                    if (randomnessFactor > 1 && Math.random() < 0.1) {
+                        delay *= 1 + Math.random() * (randomnessFactor - 1);
+                    }
+                }
 
-                // Occasionally add longer pauses
-                if (Math.random() < 0.05) {
-                    delay += (Math.random() * (400 - 100) + 100) / speedFactor;
+                // Add occasional long pauses (frequency decreases with higher randomness)
+                if (Math.random() < (0.05 / Math.max(1, randomnessFactor * 0.5))) {
+                    delay += (Math.random() * 300 + 100) / speedFactor;
                 }
 
                 setTimeout(typeNextCharacter, delay);

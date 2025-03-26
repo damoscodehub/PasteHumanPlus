@@ -235,8 +235,8 @@ function updateSpeedDisplay() {
 
 // Randomness control functions
 function decreaseRandomness() {
-  let value = Math.max(10, Math.floor(randomnessFactor * 100));
-  if (value % 10 === 0 && value > 10) {
+  let value = Math.max(0, Math.floor(randomnessFactor * 100));
+  if (value % 10 === 0 && value > 0) {
     value -= 10;
   } else {
     value = Math.floor(value / 10) * 10;
@@ -259,7 +259,7 @@ function increaseRandomness() {
 function handleRandomnessInputChange() {
   let value = parseInt(elements.randomnessInput.value);
   if (isNaN(value)) value = 100;
-  value = Math.max(10, Math.min(200, value));
+  value = Math.max(0, Math.min(200, value));
   randomnessFactor = value / 100;
   saveRandomnessFactor();
 }
