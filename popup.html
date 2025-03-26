@@ -51,13 +51,13 @@
     .speed-control {
       display: flex;
       align-items: center;
-      justify-content: space-between; /* Keep buttons on the sides */
+      justify-content: space-between;
     }
 
     .speed-input-container {
       display: flex;
-      align-items: center; /* Center input and % vertically */
-      justify-content: center; /* Center input and % horizontally */
+      align-items: center;
+      justify-content: center;
     }
 
     .speed-input {
@@ -66,7 +66,7 @@
       padding: 5px;
       border: 1px solid var(--border-color);
       border-radius: 4px;
-      margin-right: 5px; /* Space between input and % */
+      margin-right: 5px;
     }
 
     .speed-btn {
@@ -103,22 +103,93 @@
       color: var(--primary-color);
     }
 
-    .shortcuts-link {
-      display: block;
-      text-align: center;
+    .action-btn {
+      width: 100%;
+      padding: 8px;
       margin-top: 10px;
-      color: var(--secondary-color);
-      text-decoration: none;
+      background-color: var(--secondary-color);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
       font-size: 13px;
+      text-align: center;
+      transition: background-color 0.2s;
     }
 
-    .shortcuts-link:hover {
-      text-decoration: underline;
+    .action-btn:hover {
+      background-color: #2980b9;
     }
 
     .instructions {
       font-size: 13px;
       line-height: 1.4;
+    }
+
+    /* Modal styles */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.4);
+    }
+
+    .modal-content {
+      background-color: var(--background-color);
+      margin: 15% auto;
+      padding: 20px;
+      border: 1px solid var(--border-color);
+      width: 80%;
+      max-width: 300px;
+      border-radius: 5px;
+    }
+
+    .modal-title {
+      font-weight: bold;
+      margin-bottom: 15px;
+      color: var(--primary-color);
+    }
+
+    .menu-item {
+      margin: 10px 0;
+      padding: 5px;
+      cursor: pointer;
+    }
+
+    .menu-item:hover {
+      background-color: var(--highlight-color);
+    }
+
+    .menu-item-input {
+      width: 30px;
+      text-align: center;
+      margin-left: 10px;
+    }
+
+    .modal-buttons {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 20px;
+    }
+
+    .modal-btn {
+      padding: 8px 15px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .modal-btn-cancel {
+      background-color: #e0e0e0;
+    }
+
+    .modal-btn-apply {
+      background-color: var(--secondary-color);
+      color: white;
     }
   </style>
 </head>
@@ -140,10 +211,6 @@
 
   <div class="section">
     <div class="section-title">Use with Shortcuts</div>
-    <div class="shortcut-item">
-      <span>Activate extension:</span>
-      <span class="shortcut-value" id="activateValue"></span>
-    </div>
     <div class="shortcut-item" style="margin-bottom: 2px; margin-top: 4px; color:#a0a0a0; font-size: 8;">
       <span>► Set the cursor in any text field</span>
     </div>
@@ -152,25 +219,64 @@
       <span class="shortcut-value" id="startValue"></span>
     </div>
     <div class="shortcut-item">
+      <span>Pause/resume:</span>
+      <span class="shortcut-value" id="toggleValue"></span>
+    </div>    
+    <div class="shortcut-item">
       <span>Stop typing:</span>
       <span class="shortcut-value" id="stopValue"></span>
     </div>
-    <div class="shortcut-item">
-      <span>Toggle pause/resume:</span>
-      <span class="shortcut-value" id="toggleValue"></span>
+    <div class="shortcut-item" style="margin-bottom: 2px; margin-top: 4px; color:#a0a0a0; font-size: 8;">
+      <span>► The extension is activate by default</span>
     </div>
-    <a href="#" class="shortcuts-link" id="shortcutsLink">Change shortcuts</a>
+    <div class="shortcut-item">
+      <span>Deactivate/activate extension:</span>
+      <span class="shortcut-value" id="activateValue"></span>
+    </div>    
+    <button class="action-btn" id="changeShortcutsBtn">Change shortcuts</button>
   </div>
 
   <div class="section" style="border-bottom: none;">
     <div class="section-title">Use with Secondary Click</div>
     <div class="instructions">
       1. Right-click on any text field<br>
-      2. Select "v" from the menu<br>
+      2. Select "<span id="mainMenuDisplay">v</span>" from the menu<br>
       3. Choose your action: <br>
-      &nbsp;&nbsp;&nbsp;> to start typing<br>
-      &nbsp;&nbsp;&nbsp;╠ to toggle pause/resume<br>
-      &nbsp;&nbsp;&nbsp;. to stop
+      &nbsp;&nbsp;&nbsp;<span id="startMenuDisplay">></span> to start typing<br>
+      &nbsp;&nbsp;&nbsp;<span id="toggleMenuDisplay">╠</span> to toggle pause/resume<br>
+      &nbsp;&nbsp;&nbsp;<span id="stopMenuDisplay">.</span> to stop
+    </div>
+    <button class="action-btn" id="changeMenuStringsBtn">Change menu strings</button>
+  </div>
+
+  <!-- Shortcuts Help Modal -->
+  <div id="shortcutsModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-title">Change Shortcuts</div>
+      <p>To change the shortcuts, find them in the <b>PasteHumanPlus</b> section <a href="#" id="shortcutsLink">here</a>.</p>
+    </div>
+  </div>
+
+  <!-- Menu Strings Modal -->
+  <div id="menuStringsModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-title">Change Menu Strings</div>
+      <div class="menu-item">
+        Main secondary click menu: <input type="text" class="menu-item-input" id="mainMenuInput" maxlength="1">
+      </div>
+      <div class="menu-item">
+        Start typing: <input type="text" class="menu-item-input" id="startMenuInput" maxlength="1">
+      </div>
+      <div class="menu-item">
+        Toggle pause/resume: <input type="text" class="menu-item-input" id="toggleMenuInput" maxlength="1">
+      </div>
+      <div class="menu-item">
+        Stop: <input type="text" class="menu-item-input" id="stopMenuInput" maxlength="1">
+      </div>
+      <div class="modal-buttons">
+        <button class="modal-btn modal-btn-cancel" id="cancelMenuStringsBtn">Cancel</button>
+        <button class="modal-btn modal-btn-apply" id="applyMenuStringsBtn">Apply</button>
+      </div>
     </div>
   </div>
 

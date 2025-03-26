@@ -1,5 +1,11 @@
 // Default speed (130% instead of 100% for faster default)
 let speedFactor = 1.3;
+let menuStrings = {
+  main: "v",
+  start: ">",
+  toggle: "╠",
+  stop: "."
+};
 
 // DOM elements
 const elements = {
@@ -7,18 +13,35 @@ const elements = {
   speedSlider: document.getElementById('speedSlider'),
   decreaseSpeed: document.getElementById('decreaseSpeed'),
   increaseSpeed: document.getElementById('increaseSpeed'),
-  shortcutsLink: document.getElementById('shortcutsLink'),
   activateValue: document.getElementById('activateValue'),
   startValue: document.getElementById('startValue'),
   stopValue: document.getElementById('stopValue'),
-  toggleValue: document.getElementById('toggleValue')
+  toggleValue: document.getElementById('toggleValue'),
+  changeShortcutsBtn: document.getElementById('changeShortcutsBtn'),
+  changeMenuStringsBtn: document.getElementById('changeMenuStringsBtn'),
+  contextMenuInstructions: document.getElementById('contextMenuInstructions'),
+  shortcutsModal: document.getElementById('shortcutsModal'),
+  menuStringsModal: document.getElementById('menuStringsModal'),
+  mainMenuInput: document.getElementById('mainMenuInput'),
+  startMenuInput: document.getElementById('startMenuInput'),
+  toggleMenuInput: document.getElementById('toggleMenuInput'),
+  stopMenuInput: document.getElementById('stopMenuInput'),
+  cancelMenuStringsBtn: document.getElementById('cancelMenuStringsBtn'),
+  applyMenuStringsBtn: document.getElementById('applyMenuStringsBtn'),
+  shortcutsLink: document.getElementById('shortcutsLink'),
+  mainMenuDisplay: document.getElementById('mainMenuDisplay'),
+  startMenuDisplay: document.getElementById('startMenuDisplay'),
+  toggleMenuDisplay: document.getElementById('toggleMenuDisplay'),
+  stopMenuDisplay: document.getElementById('stopMenuDisplay')  
 };
 
 // Initialize the popup
 document.addEventListener('DOMContentLoaded', function() {
   loadSpeedFactor();
   loadShortcuts();
+  loadMenuStrings();
   setupEventListeners();
+  updateContextMenuInstructions();
 });
 
 function loadSpeedFactor() {
@@ -51,6 +74,15 @@ function loadShortcuts() {
   });
 }
 
+function loadMenuStrings() {
+  chrome.storage.local.get(['menuStrings'], function(result) {
+    if (result.menuStrings) {
+      menuStrings = result.menuStrings;
+    }
+    updateContextMenuInstructions();
+  });
+}
+
 function setupEventListeners() {
   // Speed controls
   elements.decreaseSpeed.addEventListener('click', decreaseSpeed);
@@ -58,10 +90,71 @@ function setupEventListeners() {
   elements.speedInput.addEventListener('change', handleSpeedInputChange);
   elements.speedSlider.addEventListener('input', handleSpeedSliderChange);
   
-  // Shortcuts link
+  // Shortcuts button
+  elements.changeShortcutsBtn.addEventListener('click', function() {
+    elements.shortcutsModal.style.display = 'block';
+  });
+  
+  // Menu strings button
+  elements.changeMenuStringsBtn.addEventListener('click', function() {
+    // Load current values into modal inputs
+    elements.mainMenuInput.value = menuStrings.main;
+    elements.startMenuInput.value = menuStrings.start;
+    elements.toggleMenuInput.value = menuStrings.toggle;
+    elements.stopMenuInput.value = menuStrings.stop;
+    
+    elements.menuStringsModal.style.display = 'block';
+  });
+  
+  // Modal close handlers
   elements.shortcutsLink.addEventListener('click', function(e) {
     e.preventDefault();
     chrome.tabs.create({url: 'chrome://extensions/shortcuts'});
+    elements.shortcutsModal.style.display = 'none';
+  });
+  
+  // Close modals when clicking outside
+  window.addEventListener('click', function(event) {
+    if (event.target === elements.shortcutsModal) {
+      elements.shortcutsModal.style.display = 'none';
+    }
+    if (event.target === elements.menuStringsModal) {
+      elements.menuStringsModal.style.display = 'none';
+    }
+  });
+  
+  // Menu strings modal buttons
+  elements.cancelMenuStringsBtn.addEventListener('click', function() {
+    elements.menuStringsModal.style.display = 'none';
+  });
+  
+  elements.applyMenuStringsBtn.addEventListener('click', function() {
+    menuStrings = {
+      main: elements.mainMenuInput.value || "v",
+      start: elements.startMenuInput.value || ">",
+      toggle: elements.toggleMenuInput.value || "╠",
+      stop: elements.stopMenuInput.value || "."
+    };
+    
+    chrome.storage.local.set({menuStrings: menuStrings}, function() {
+      updateContextMenuInstructions();
+      updateContextMenu();
+      elements.menuStringsModal.style.display = 'none';
+    });
+  });
+}
+
+function updateContextMenuInstructions() {
+  elements.mainMenuDisplay.textContent = menuStrings.main;
+  elements.startMenuDisplay.textContent = menuStrings.start;
+  elements.toggleMenuDisplay.textContent = menuStrings.toggle;
+  elements.stopMenuDisplay.textContent = menuStrings.stop;
+}
+
+function updateContextMenu() {
+  chrome.runtime.sendMessage({
+    action: 'updateContextMenu',
+    menuStrings: menuStrings
   });
 }
 
