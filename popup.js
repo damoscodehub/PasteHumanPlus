@@ -56,6 +56,7 @@ function hideModal(modal) {
 
 // Initialize the popup
 document.addEventListener('DOMContentLoaded', function() {
+  loadShortcuts();
   loadSettings();
   setupEventListeners();
 });
@@ -79,20 +80,40 @@ function loadSettings() {
 }
 
 function loadShortcuts() {
+  // Debugging: Check if elements exist
+  console.log('Elements:', {
+    startValue: !!elements.startValue,
+    stopValue: !!elements.stopValue,
+    toggleValue: !!elements.toggleValue,
+    activateValue: !!elements.activateValue
+  });
+
   chrome.commands.getAll(function(commands) {
+    console.log('Retrieved commands:', commands);
+
     commands.forEach(command => {
+      console.log(`Processing command: ${command.name}, Shortcut: ${command.shortcut}`);
+
       switch(command.name) {
         case '_execute_action':
-          elements.activateValue.textContent = command.shortcut || 'Not set';
+          if (elements.activateValue) {
+            elements.activateValue.textContent = command.shortcut || 'Not set';
+          }
           break;
         case 'start_typing':
-          elements.startValue.textContent = command.shortcut || 'Not set';
+          if (elements.startValue) {
+            elements.startValue.textContent = command.shortcut || 'Not set';
+          }
           break;
         case 'stop_typing':
-          elements.stopValue.textContent = command.shortcut || 'Not set';
+          if (elements.stopValue) {
+            elements.stopValue.textContent = command.shortcut || 'Not set';
+          }
           break;
         case 'toggle_typing':
-          elements.toggleValue.textContent = command.shortcut || 'Not set';
+          if (elements.toggleValue) {
+            elements.toggleValue.textContent = command.shortcut || 'Not set';
+          }
           break;
       }
     });
