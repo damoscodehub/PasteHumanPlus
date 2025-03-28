@@ -77,8 +77,7 @@ function emulateTyping(text, session, delayedStart, speedFactor = 1.0, randomnes
     console.log('content.js: Randomness factor:', randomnessFactor);
 
     let i = 0;
-    // Adjusted base delay to feel more human-like at 100%
-    const baseDelay = 100 / speedFactor; // Increased from 65 to 100
+    const baseDelay = 100 / speedFactor;
 
     const startTyping = function () {
         function typeNextCharacter() {
@@ -108,8 +107,8 @@ function emulateTyping(text, session, delayedStart, speedFactor = 1.0, randomnes
                     // 0% randomness - perfectly consistent timing
                     delay = baseDelay;
                 } else {
-                    // Enhanced randomness calculation with broader effect
-                    const variationScale = randomnessFactor / 100; // Full use of 0-2 range
+                    // Randomness calculation
+                    const variationScale = randomnessFactor;
                     
                     // Exponential randomness for more dramatic effect
                     const minDelayFactor = Math.max(0.3, 1 - Math.pow(variationScale, 1.5));
