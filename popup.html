@@ -154,9 +154,10 @@
       border-radius: 5px;
       box-shadow: 0 4px 8px rgba(0,0,0,0.2);
       transform: scale(0.95);
-      transition: transform 0.15s ease-out;
-      opacity: 0;
       transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+      opacity: 0;
+      margin: 0 auto;
+      box-sizing: border-box; 
     }
 
     .modal.show .modal-content {
@@ -194,6 +195,7 @@
 
     .menu-string-container {
       margin: 15px 0;
+      width: 100%;
     }
 
     .menu-string-label {
@@ -208,6 +210,7 @@
       border: 1px solid var(--border-color);
       border-radius: 4px;
       font-family: inherit;
+      box-sizing: border-box;
     }
 
     .menu-string-input:focus {
