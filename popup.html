@@ -38,10 +38,16 @@
       margin: 0 auto 10px;
     }
 
+    .separator {
+      height: 1px;
+      background-color: var(--border-color);
+      margin: 10px 0;
+      width: 100%;
+    }
+
     .section {
-      margin-bottom: 8px;
-      padding-bottom: 10px;
-      border-bottom: 1px solid var(--border-color);
+      margin-bottom: 6px;
+      padding-bottom: 6px;
     }
 
     .section-title {
@@ -90,7 +96,7 @@
 
     .speed-slider, .randomness-slider {
       width: 100%;
-      margin: 15px 0;
+      margin: 8px 0 4px 0;
     }
 
     .shortcut-item {
@@ -110,7 +116,6 @@
     .action-btn {
       width: 100%;
       padding: 8px;
-      margin-top: 10px;
       background-color: var(--secondary-color);
       color: white;
       border: none;
@@ -244,6 +249,8 @@
     <input type="range" class="speed-slider" id="speedSlider" min="10" max="200" value="100">
   </div>
 
+  <div class="separator"></div>
+
   <div class="section">
     <div class="section-title">Randomness of Delay</div>
     <div class="randomness-control">
@@ -256,6 +263,8 @@
     </div>
     <input type="range" class="randomness-slider" id="randomnessSlider" min="0" max="200" value="100">
   </div>
+
+  <div class="separator"></div>
 
   <div class="section">
     <button class="action-btn" id="shortcutsBtn">Keboard Shortcuts</button>
