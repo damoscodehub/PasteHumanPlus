@@ -107,22 +107,18 @@ function emulateTyping(text, session, delayedStart, speedFactor = 1.0, randomnes
                     // 0% randomness - perfectly consistent timing
                     delay = baseDelay;
                 } else {
-                    // Randomness calculation
-                    const variationScale = randomnessFactor;
+                    // Hyper-sensitive randomness calculation
+                    const variationPower = 1 + (randomnessFactor * 0.75); // Now properly used
+                    const minDelay = baseDelay * Math.max(0.15, 1 - Math.pow(randomnessFactor/variationPower, 1.2));
+                    const maxDelay = baseDelay * (1 + Math.pow(randomnessFactor*variationPower, 1.2)/2);
                     
-                    // Exponential randomness for more dramatic effect
-                    const minDelayFactor = Math.max(0.3, 1 - Math.pow(variationScale, 1.5));
-                    const maxDelayFactor = 1 + Math.pow(variationScale, 1.5) * 2;
+                    delay = minDelay + Math.random() * (maxDelay - minDelay);
                     
-                    // Base random delay calculation with exponential spread
-                    delay = baseDelay * (minDelayFactor + Math.random() * (maxDelayFactor - minDelayFactor));
-                    
-                    // More dramatic occasional long pauses
-                    const pauseProbability = variationScale * 0.1; // Increases with randomness
-                    
-                    if (randomnessFactor > 0 && Math.random() < pauseProbability) {
-                        const longPauseVariation = Math.pow(variationScale, 1.5) * 3;
-                        delay += (Math.random() * 500 + 200) * longPauseVariation / speedFactor;
+                    // Extreme pauses at higher randomness
+                    const pauseProbability = 0.1 * Math.sqrt(randomnessFactor*variationPower);
+                    if (Math.random() < pauseProbability) {
+                        const pauseIntensity = Math.pow(randomnessFactor, variationPower/2);
+                        delay += (Math.random() * 1000 * pauseIntensity + 200) / speedFactor;
                     }
                 }
 
