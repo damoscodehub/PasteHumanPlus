@@ -256,23 +256,13 @@ function updateSpeedDisplay() {
 
 // Randomness control functions
 function decreaseRandomness() {
-  let value = Math.max(0, Math.floor(randomnessFactor * 100));
-  if (value % 10 === 0 && value > 0) {
-    value -= 10;
-  } else {
-    value = Math.floor(value / 10) * 10;
-  }
+  let value = Math.max(0, Math.floor(randomnessFactor * 100) - 10); // Simple -10 with floor at 0
   randomnessFactor = value / 100;
   saveRandomnessFactor();
 }
 
 function increaseRandomness() {
-  let value = Math.min(200, Math.floor(randomnessFactor * 100));
-  if (value % 10 === 0 && value < 200) {
-    value += 10;
-  } else {
-    value = Math.ceil(value / 10) * 10;
-  }
+  let value = Math.min(200, Math.floor(randomnessFactor * 100) + 10); // Simple +10 with ceiling at 200
   randomnessFactor = value / 100;
   saveRandomnessFactor();
 }

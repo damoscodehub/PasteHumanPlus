@@ -77,7 +77,8 @@ function emulateTyping(text, session, delayedStart, speedFactor = 1.0, randomnes
     console.log('content.js: Randomness factor:', randomnessFactor);
 
     let i = 0;
-    const baseDelay = 65 / speedFactor; // Average delay in milliseconds
+    // Adjusted base delay to feel more human-like at 100%
+    const baseDelay = 100 / speedFactor; // Increased from 65 to 100
 
     const startTyping = function () {
         function typeNextCharacter() {
@@ -107,26 +108,22 @@ function emulateTyping(text, session, delayedStart, speedFactor = 1.0, randomnes
                     // 0% randomness - perfectly consistent timing
                     delay = baseDelay;
                 } else {
-                    // Refined randomness calculation
-                    const variationScale = Math.min(2, randomnessFactor); // Cap at 200%
+                    // Enhanced randomness calculation with broader effect
+                    const variationScale = randomnessFactor / 100; // Full use of 0-2 range
                     
-                    // General delay variation
-                    const minDelayFactor = Math.max(0.5, 1 - 0.5 * variationScale);
-                    const maxDelayFactor = 1 + 0.5 * variationScale;
+                    // Exponential randomness for more dramatic effect
+                    const minDelayFactor = Math.max(0.3, 1 - Math.pow(variationScale, 1.5));
+                    const maxDelayFactor = 1 + Math.pow(variationScale, 1.5) * 2;
                     
-                    // Base random delay calculation
+                    // Base random delay calculation with exponential spread
                     delay = baseDelay * (minDelayFactor + Math.random() * (maxDelayFactor - minDelayFactor));
                     
-                    // Occasional long pauses
-                    // Frequency of long pauses decreases with randomness
-                    const pauseProbability = randomnessFactor > 0 
-                        ? (0.05 / Math.max(1, randomnessFactor * 0.5)) 
-                        : 0;
+                    // More dramatic occasional long pauses
+                    const pauseProbability = variationScale * 0.1; // Increases with randomness
                     
-                    // Long pause variation
                     if (randomnessFactor > 0 && Math.random() < pauseProbability) {
-                        const longPauseVariation = 1 + Math.random() * (variationScale - 1);
-                        delay += (Math.random() * 300 + 100) * longPauseVariation / speedFactor;
+                        const longPauseVariation = Math.pow(variationScale, 1.5) * 3;
+                        delay += (Math.random() * 500 + 200) * longPauseVariation / speedFactor;
                     }
                 }
 
