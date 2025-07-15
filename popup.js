@@ -1,6 +1,7 @@
 // Default values
 let speedFactor = 1.0;
 let randomnessFactor = 1.0;
+let mistakeProbability = 0.03; // Default: 3%
 let menuStrings = {
   main: "v",
   start: ">",
@@ -36,7 +37,11 @@ const elements = {
   stopMenuInput: document.getElementById('stopMenuInput'),
   cancelMenuStringsBtn: document.getElementById('cancelMenuStringsBtn'),
   applyMenuStringsBtn: document.getElementById('applyMenuStringsBtn'),
-  shortcutsLink: document.getElementById('shortcutsLink')
+  shortcutsLink: document.getElementById('shortcutsLink'),
+  mistakeInput: document.getElementById('mistakeInput'),
+  mistakeSlider: document.getElementById('mistakeSlider'),
+  decreaseMistake: document.getElementById('decreaseMistake'),
+  increaseMistake: document.getElementById('increaseMistake'),
 };
 
 // Helper functions for modal animations
@@ -62,18 +67,22 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function loadSettings() {
-  chrome.storage.local.get(['speedFactor', 'randomnessFactor', 'menuStrings'], function(result) {
+  chrome.storage.local.get(['speedFactor', 'randomnessFactor', 'mistakeProbability', 'menuStrings'], function(result) {
     if (result.speedFactor !== undefined) {
       speedFactor = result.speedFactor;
     }
     if (result.randomnessFactor !== undefined) {
       randomnessFactor = result.randomnessFactor;
     }
+    if (result.mistakeProbability !== undefined) {
+      mistakeProbability = result.mistakeProbability;
+    }
     if (result.menuStrings) {
       menuStrings = result.menuStrings;
     }
     updateSpeedDisplay();
     updateRandomnessDisplay();
+    updateMistakeDisplay();
     updateContextMenuInstructions();
     loadShortcuts();
   });
@@ -132,6 +141,12 @@ function setupEventListeners() {
   elements.increaseRandomness.addEventListener('click', increaseRandomness);
   elements.randomnessInput.addEventListener('change', handleRandomnessInputChange);
   elements.randomnessSlider.addEventListener('input', handleRandomnessSliderChange);
+  
+  // Mistake controls
+  elements.decreaseMistake.addEventListener('click', decreaseMistake);
+  elements.increaseMistake.addEventListener('click', increaseMistake);
+  elements.mistakeInput.addEventListener('change', handleMistakeInputChange);
+  elements.mistakeSlider.addEventListener('input', handleMistakeSliderChange);
   
   // Shortcuts button
   elements.shortcutsBtn.addEventListener('click', function() {
@@ -297,4 +312,45 @@ function updateRandomnessDisplay() {
   const value = Math.round(randomnessFactor * 100);
   elements.randomnessInput.value = value;
   elements.randomnessSlider.value = value;
+}
+
+// Mistake control functions
+function decreaseMistake() {
+  let value = Math.max(0, Math.floor(mistakeProbability * 100) - 1);
+  mistakeProbability = value / 100;
+  saveMistakeProbability();
+}
+function increaseMistake() {
+  let value = Math.min(20, Math.floor(mistakeProbability * 100) + 1);
+  mistakeProbability = value / 100;
+  saveMistakeProbability();
+}
+function handleMistakeInputChange() {
+  let value = parseInt(elements.mistakeInput.value);
+  if (isNaN(value)) value = 3;
+  value = Math.max(0, Math.min(20, value));
+  mistakeProbability = value / 100;
+  saveMistakeProbability();
+}
+function handleMistakeSliderChange() {
+  mistakeProbability = parseInt(elements.mistakeSlider.value) / 100;
+  updateMistakeDisplay();
+  saveMistakeProbability();
+}
+function saveMistakeProbability() {
+  console.log('popup.js: Saving mistake probability:', mistakeProbability);
+  chrome.storage.local.set({mistakeProbability: mistakeProbability}, function() {
+    updateMistakeDisplay();
+    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+      chrome.tabs.sendMessage(tabs[0].id, {
+        action: 'updateMistakeProbability',
+        mistakeProbability: mistakeProbability
+      });
+    });
+  });
+}
+function updateMistakeDisplay() {
+  const value = Math.round(mistakeProbability * 100);
+  elements.mistakeInput.value = value;
+  elements.mistakeSlider.value = value;
 }
