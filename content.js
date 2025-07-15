@@ -182,10 +182,141 @@ function emulateTyping(text, session, delayedStart, speedFactor = 1.0, randomnes
 }
 
 function getRandomWrongChar(correctChar) {
-    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    let wrong;
-    do {
-        wrong = chars[Math.floor(Math.random() * chars.length)];
-    } while (wrong === correctChar);
-    return wrong;
+    // Define adjacent keys on a QWERTY keyboard (most common mistakes)
+    const adjacentKeys = {
+        'a': ['q', 'w', 's', 'z'],
+        'b': ['v', 'g', 'n'],
+        'c': ['x', 'v', 'f'],
+        'd': ['s', 'e', 'r', 'f', 'c', 'x'],
+        'e': ['w', 's', 'd', 'r'],
+        'f': ['d', 'r', 't', 'g', 'v', 'c'],
+        'g': ['f', 't', 'y', 'h', 'b', 'v'],
+        'h': ['g', 'y', 'u', 'j', 'n', 'b'],
+        'i': ['u', 'j', 'k', 'o'],
+        'j': ['h', 'u', 'i', 'k', 'm', 'n'],
+        'k': ['j', 'i', 'o', 'l', 'm'],
+        'l': ['k', 'o', 'p'],
+        'm': ['n', 'j', 'k'],
+        'n': ['b', 'h', 'j', 'm'],
+        'o': ['i', 'k', 'l', 'p'],
+        'p': ['o', 'l'],
+        'q': ['w', 'a'],
+        'r': ['e', 'd', 'f', 't'],
+        's': ['a', 'w', 'e', 'd', 'z', 'x'],
+        't': ['r', 'f', 'g', 'y'],
+        'u': ['y', 'h', 'j', 'i'],
+        'v': ['c', 'f', 'g', 'b'],
+        'w': ['q', 'a', 's', 'e'],
+        'x': ['z', 's', 'd', 'c'],
+        'y': ['t', 'g', 'h', 'u'],
+        'z': ['a', 's', 'x'],
+        // Numbers
+        '0': ['9', 'p', 'o'],
+        '1': ['q', '2'],
+        '2': ['1', 'q', 'w', '3'],
+        '3': ['2', 'w', 'e', '4'],
+        '4': ['3', 'e', 'r', '5'],
+        '5': ['4', 'r', 't', '6'],
+        '6': ['5', 't', 'y', '7'],
+        '7': ['6', 'y', 'u', '8'],
+        '8': ['7', 'u', 'i', '9'],
+        '9': ['8', 'i', 'o', '0']
+    };
+
+    // Similar-looking characters (common visual mistakes)
+    const similarChars = {
+        'a': ['q', 'o', 'e'],
+        'b': ['h', 'n', 'v'],
+        'c': ['e', 'o'],
+        'd': ['b', 'p', 'q'],
+        'e': ['a', 'c', 'o'],
+        'f': ['t', 'r'],
+        'g': ['q', '9'],
+        'h': ['n', 'b', 'u'],
+        'i': ['l', '1', 'j'],
+        'j': ['i', 'l', '1'],
+        'k': ['h', 'l'],
+        'l': ['i', '1', 'j', 'k'],
+        'm': ['n', 'w'],
+        'n': ['m', 'h', 'u'],
+        'o': ['0', 'a', 'c', 'e'],
+        'p': ['o', 'q', 'd'],
+        'q': ['a', 'p', 'g'],
+        'r': ['f', 't'],
+        's': ['z', 'a'],
+        't': ['f', 'r', 'y'],
+        'u': ['y', 'h', 'n'],
+        'v': ['b', 'c'],
+        'w': ['v', 'm'],
+        'x': ['z', 'c'],
+        'y': ['t', 'u'],
+        'z': ['s', 'x'],
+        '0': ['o', '9'],
+        '1': ['l', 'i'],
+        '2': ['z'],
+        '3': ['e'],
+        '5': ['s'],
+        '6': ['b'],
+        '8': ['b'],
+        '9': ['g', '0']
+    };
+
+    // Case mistakes (more common to type lowercase instead of uppercase)
+    const caseMistakes = {
+        'A': ['a', 'q', 's'],
+        'B': ['b', 'v', 'n'],
+        'C': ['c', 'x', 'v'],
+        'D': ['d', 's', 'f'],
+        'E': ['e', 'w', 'r'],
+        'F': ['f', 'd', 'g'],
+        'G': ['g', 'f', 'h'],
+        'H': ['h', 'g', 'j'],
+        'I': ['i', 'u', 'k'],
+        'J': ['j', 'h', 'k'],
+        'K': ['k', 'j', 'l'],
+        'L': ['l', 'k'],
+        'M': ['m', 'n'],
+        'N': ['n', 'b', 'm'],
+        'O': ['o', 'i', 'p'],
+        'P': ['p', 'o'],
+        'Q': ['q', 'a', 'w'],
+        'R': ['r', 'e', 't'],
+        'S': ['s', 'a', 'd'],
+        'T': ['t', 'r', 'y'],
+        'U': ['u', 'y', 'i'],
+        'V': ['v', 'c', 'b'],
+        'W': ['w', 'q', 'e'],
+        'X': ['x', 'z', 'c'],
+        'Y': ['y', 't', 'u'],
+        'Z': ['z', 'a', 's']
+    };
+
+    let possibleMistakes = [];
+    
+    // Add adjacent keys (highest priority - most common)
+    if (adjacentKeys[correctChar]) {
+        possibleMistakes = possibleMistakes.concat(adjacentKeys[correctChar]);
+    }
+    
+    // Add similar characters (medium priority)
+    if (similarChars[correctChar]) {
+        possibleMistakes = possibleMistakes.concat(similarChars[correctChar]);
+    }
+    
+    // Add case mistakes (for uppercase letters)
+    if (caseMistakes[correctChar]) {
+        possibleMistakes = possibleMistakes.concat(caseMistakes[correctChar]);
+    }
+    
+    // If no specific mistakes defined, use a fallback
+    if (possibleMistakes.length === 0) {
+        const allChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        possibleMistakes = allChars.split('').filter(char => char !== correctChar);
+    }
+    
+    // Remove duplicates and the correct character
+    possibleMistakes = [...new Set(possibleMistakes)].filter(char => char !== correctChar);
+    
+    // Return a random mistake from the possible ones
+    return possibleMistakes[Math.floor(Math.random() * possibleMistakes.length)];
 }
