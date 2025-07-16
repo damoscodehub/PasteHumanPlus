@@ -1,3 +1,14 @@
+// === Configurable Parameters ===
+const IMMEDIATE_FIX_PERCENTAGE = 75; // % of mistakes fixed immediately
+const MIN_CHARS_BEFORE_REVIEW = 5;
+const MAX_CHARS_BEFORE_REVIEW = 15;
+const MIN_REVIEW_PAUSE_MS = 300;
+const MAX_REVIEW_PAUSE_MS = 1200;
+const MIN_IMMEDIATE_FIX_PAUSE_MS = 100;
+const MAX_IMMEDIATE_FIX_PAUSE_MS = 400;
+const MIN_BETWEEN_FIX_PAUSE_MS = 100;
+const MAX_BETWEEN_FIX_PAUSE_MS = 300;
+
 let currentTypingSession = null;
 let isPaused = false;
 let remainingText = "";
@@ -73,6 +84,9 @@ function emulateTyping(text, session, delayedStart, speedFactor = 1.0, randomnes
     let i = 0;
     const baseDelay = 100 / speedFactor;
     const mistakeDelay = Math.max(350, baseDelay * 3); // At least 350ms, or 3x baseDelay
+    let charsSinceLastReview = 0;
+    let reviewCharThreshold = getRandomInt(MIN_CHARS_BEFORE_REVIEW, MAX_CHARS_BEFORE_REVIEW);
+    let mistakeLog = [];
 
     const startTyping = function () {
         function typeNextCharacter() {
@@ -87,27 +101,39 @@ function emulateTyping(text, session, delayedStart, speedFactor = 1.0, randomnes
                 const shouldMakeMistake = randomValue < mistakeProbability && text[i].match(/[a-zA-Z0-9]/);
                 
                 if (shouldMakeMistake) {
-                    // Type a wrong character
+                    // Decide if this mistake should be fixed immediately or delayed
+                    const isImmediate = Math.random() < (IMMEDIATE_FIX_PERCENTAGE / 100);
                     const wrongChar = getRandomWrongChar(text[i]);
                     let event = new KeyboardEvent("keydown", {key: wrongChar});
                     activeElement.dispatchEvent(event);
                     document.execCommand("insertText", false, wrongChar);
-
-                    setTimeout(() => {
-                        // Backspace
-                        let backspaceEvent = new KeyboardEvent("keydown", {key: "Backspace"});
-                        activeElement.dispatchEvent(backspaceEvent);
-                        document.execCommand("delete", false, null);
-
+                    // Log the mistake for possible delayed correction
+                    mistakeLog.push({pos: i, wrong: wrongChar, correct: text[i]});
+                    if (isImmediate) {
+                        // Immediate fix: short pause, then fix
                         setTimeout(() => {
-                            // Type the correct character
-                            let correctEvent = new KeyboardEvent("keydown", {key: text[i]});
-                            activeElement.dispatchEvent(correctEvent);
-                            document.execCommand("insertText", false, text[i++]);
-                            setTimeout(typeNextCharacter, baseDelay);
-                        }, mistakeDelay);
-                    }, mistakeDelay);
-                    return;
+                            // Backspace
+                            let backspaceEvent = new KeyboardEvent("keydown", {key: "Backspace"});
+                            activeElement.dispatchEvent(backspaceEvent);
+                            document.execCommand("delete", false, null);
+                            setTimeout(() => {
+                                // Type the correct character
+                                let correctEvent = new KeyboardEvent("keydown", {key: text[i]});
+                                activeElement.dispatchEvent(correctEvent);
+                                document.execCommand("insertText", false, text[i++]);
+                                // Remove from mistake log (since fixed)
+                                mistakeLog.pop();
+                                setTimeout(typeNextCharacter, baseDelay);
+                            }, getRandomInt(MIN_IMMEDIATE_FIX_PAUSE_MS, MAX_IMMEDIATE_FIX_PAUSE_MS));
+                        }, getRandomInt(MIN_IMMEDIATE_FIX_PAUSE_MS, MAX_IMMEDIATE_FIX_PAUSE_MS));
+                        return;
+                    } else {
+                        // Delayed fix: just continue typing, fix later
+                        i++;
+                        charsSinceLastReview++;
+                        setTimeout(typeNextCharacter, baseDelay);
+                        return;
+                    }
                 }
 
                 let event = new KeyboardEvent("keydown", {
@@ -120,6 +146,19 @@ function emulateTyping(text, session, delayedStart, speedFactor = 1.0, randomnes
 
                 activeElement.dispatchEvent(event);
                 document.execCommand("insertText", false, text[i++]);
+                charsSinceLastReview++;
+
+                // Check if it's time for a review phase
+                if (charsSinceLastReview >= reviewCharThreshold && mistakeLog.length > 0) {
+                    setTimeout(() => {
+                        reviewAndFixMistakes(() => {
+                            charsSinceLastReview = 0;
+                            reviewCharThreshold = getRandomInt(MIN_CHARS_BEFORE_REVIEW, MAX_CHARS_BEFORE_REVIEW);
+                            setTimeout(typeNextCharacter, baseDelay);
+                        });
+                    }, getRandomInt(MIN_REVIEW_PAUSE_MS, MAX_REVIEW_PAUSE_MS));
+                    return;
+                }
 
                 let delay;
                 if (randomnessFactor <= 0) {
@@ -137,16 +176,62 @@ function emulateTyping(text, session, delayedStart, speedFactor = 1.0, randomnes
                 }
                 setTimeout(typeNextCharacter, delay);
             } else if (i >= text.length) {
-                // console.log('content.js: Typing completed'); // Removed console.log
+                // Typing completed
+                if (mistakeLog.length > 0) {
+                    console.log('[DEBUG] Final review phase triggered. mistakeLog:', JSON.stringify(mistakeLog));
+                    reviewAndFixMistakes(() => {
+                        console.log('[DEBUG] Final review phase complete. activeElement.value:', activeElement.value);
+                        // All mistakes fixed, typing session truly complete
+                    });
+                }
             }
         }
         typeNextCharacter();
     };
     if (delayedStart) {
-        // console.log('content.js: Starting typing with a delay'); // Removed console.log
         setTimeout(startTyping, 0);
     } else {
         startTyping();
+    }
+    // --- Helper for review phase ---
+    function reviewAndFixMistakes(callback) {
+        console.log('[DEBUG] Entering reviewAndFixMistakes. mistakeLog:', JSON.stringify(mistakeLog));
+        if (mistakeLog.length === 0) {
+            callback();
+            return;
+        }
+        // Randomly choose order: forward or backward
+        const order = Math.random() < 0.5 ? 'forward' : 'backward';
+        let indices = order === 'forward'
+            ? [...Array(mistakeLog.length).keys()]
+            : [...Array(mistakeLog.length).keys()].reverse();
+        let fixIndex = 0;
+        function fixNext() {
+            if (fixIndex >= indices.length) {
+                mistakeLog = [];
+                // Move caret to end
+                setCaretPosition(activeElement, getTextLength(activeElement));
+                console.log('[DEBUG] Finished reviewAndFixMistakes.');
+                callback();
+                return;
+            }
+            const idx = indices[fixIndex];
+            const {pos, correct} = mistakeLog[idx];
+            // Move caret to position
+            setCaretPosition(activeElement, pos + 1); // +1 to be after the wrong char
+            // Backspace
+            stealthyBackspace(activeElement);
+            setTimeout(() => {
+                // Type the correct character
+                stealthyInsertText(activeElement, correct);
+                setTimeout(() => {
+                    fixIndex++;
+                    fixNext();
+                }, getRandomInt(MIN_BETWEEN_FIX_PAUSE_MS, MAX_BETWEEN_FIX_PAUSE_MS));
+            }, getRandomInt(MIN_BETWEEN_FIX_PAUSE_MS, MAX_BETWEEN_FIX_PAUSE_MS));
+        }
+        console.log('[DEBUG] Before starting fixNext.');
+        fixNext();
     }
 }
 
@@ -173,4 +258,82 @@ function getRandomWrongChar(correctChar) {
 
     // Return random character from selected level
     return selectedLevel[Math.floor(Math.random() * selectedLevel.length)];
+}
+
+// --- Utility for stealthy text/caret manipulation ---
+function isTextInput(el) {
+    return el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && /^(text|search|url|tel|password)$/i.test(el.type)));
+}
+function isContentEditable(el) {
+    return el && el.isContentEditable;
+}
+// Set caret position stealthily
+function setCaretPosition(el, pos) {
+    if (isTextInput(el)) {
+        el.setSelectionRange(pos, pos);
+        el.focus();
+    } else if (isContentEditable(el)) {
+        el.focus();
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        const range = document.createRange();
+        // Find the text node and offset for the given pos
+        let node = el;
+        let offset = pos;
+        // Walk the child nodes to find the right text node
+        function findTextNode(node, pos) {
+            if (node.nodeType === Node.TEXT_NODE) {
+                if (pos <= node.length) return {node, offset: pos};
+                else return {node: null, offset: pos - node.length};
+            }
+            for (let child of node.childNodes) {
+                let res = findTextNode(child, pos);
+                if (res.node) return res;
+                pos = res.offset;
+            }
+            return {node: null, offset: pos};
+        }
+        let res = findTextNode(el, pos);
+        if (res.node) {
+            range.setStart(res.node, res.offset);
+            range.collapse(true);
+            selection.addRange(range);
+        } else {
+            // fallback: place at end
+            range.selectNodeContents(el);
+            range.collapse(false);
+            selection.addRange(range);
+        }
+    }
+}
+// Insert text stealthily
+function stealthyInsertText(el, text) {
+    el.focus();
+    // Keyboard event
+    for (let c of text) {
+        let event = new KeyboardEvent("keydown", {key: c});
+        el.dispatchEvent(event);
+        document.execCommand("insertText", false, c);
+        let inputEvent = new Event('input', {bubbles: true});
+        el.dispatchEvent(inputEvent);
+    }
+}
+// Stealthy backspace (delete one char before caret)
+function stealthyBackspace(el) {
+    el.focus();
+    let event = new KeyboardEvent("keydown", {key: "Backspace"});
+    el.dispatchEvent(event);
+    document.execCommand("delete", false, null);
+    let inputEvent = new Event('input', {bubbles: true});
+    el.dispatchEvent(inputEvent);
+}
+
+// --- Utility ---
+function getRandomInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+function getTextLength(el) {
+    if (isTextInput(el)) return el.value.length;
+    if (isContentEditable(el)) return el.innerText.length;
+    return 0;
 }
