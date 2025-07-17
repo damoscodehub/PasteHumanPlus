@@ -2,8 +2,8 @@
 const IMMEDIATE_FIX_PERCENTAGE = 75; // % of mistakes fixed immediately
 const MIN_CHARS_BEFORE_REVIEW = 5;
 const MAX_CHARS_BEFORE_REVIEW = 15;
-const MIN_REVIEW_PAUSE_MS = 300;
-const MAX_REVIEW_PAUSE_MS = 1200;
+const MIN_REVIEW_PAUSE_MS = 1000;
+const MAX_REVIEW_PAUSE_MS = 3000;
 const MIN_IMMEDIATE_FIX_PAUSE_MS = 100;
 const MAX_IMMEDIATE_FIX_PAUSE_MS = 400;
 const MIN_BETWEEN_FIX_PAUSE_MS = 100;
@@ -29,6 +29,40 @@ chrome.storage.local.get(['speedFactor', 'randomnessFactor', 'mistakeProbability
   }
 });
 
+// === Typing State for True Pause/Resume ===
+let typingState = null;
+
+function clearTypingState() {
+    typingState = null;
+}
+
+function pauseTyping() {
+    if (typingState) {
+        typingState.isPaused = true;
+        logDebugState('Paused', typingState);
+    }
+}
+
+function resumeTyping() {
+    if (typingState && typingState.isPaused) {
+        typingState.isPaused = false;
+        logDebugState('Resumed', typingState);
+        proceedTyping();
+    }
+}
+
+function proceedTyping() {
+    if (!typingState || typingState.isPaused) return;
+    const state = typingState;
+    if (state.phase === 'typing') {
+        typeNextCharacter(state);
+    } else if (state.phase === 'immediateFix') {
+        doImmediateFix(state);
+    } else if (state.phase === 'review') {
+        doReviewFix(state);
+    }
+}
+
 chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
     if (request.action === "updateSpeedFactor") {
         currentSpeedFactor = request.speedFactor;
@@ -37,16 +71,8 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
     } else if (request.action === "updateMistakeProbability") {
         currentMistakeProbability = request.mistakeProbability;
     } else if (request.action === "emulateTyping") {
-        // Always reset the state when starting a new typing session
         currentTypingSession = Math.random().toString();
-        isPaused = false;
-        remainingText = "";
-        
-        // Use speed factor from request if provided, otherwise use stored speed factor
-        currentSpeedFactor = request.speedFactor || currentSpeedFactor;
-        currentRandomnessFactor = request.randomnessFactor || currentRandomnessFactor;
-        currentMistakeProbability = request.mistakeProbability || currentMistakeProbability;
-
+        clearTypingState();
         navigator.clipboard
             .readText()
             .then((clipText) => {
@@ -57,14 +83,13 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
             });
     } else if (request.action === "stopTyping") {
         currentTypingSession = null;
-        isPaused = false;
-        remainingText = "";
+        clearTypingState();
     } else if (request.action === "toggleTyping") {
         if (currentTypingSession) {
-            isPaused = !isPaused;
-            if (!isPaused && remainingText) {
-                emulateTyping(remainingText, currentTypingSession, false, currentSpeedFactor, currentRandomnessFactor, currentMistakeProbability);
-                remainingText = "";
+            if (typingState && typingState.isPaused) {
+                resumeTyping();
+            } else {
+                pauseTyping();
             }
         }
     }
@@ -80,158 +105,199 @@ window.addEventListener("keydown", function (event) {
 
 function emulateTyping(text, session, delayedStart, speedFactor = 1.0, randomnessFactor = 1.0, mistakeProbability = currentMistakeProbability) {
     const activeElement = document.activeElement;
-
     let i = 0;
     const baseDelay = 100 / speedFactor;
-    const mistakeDelay = Math.max(350, baseDelay * 3); // At least 350ms, or 3x baseDelay
     let charsSinceLastReview = 0;
     let reviewCharThreshold = getRandomInt(MIN_CHARS_BEFORE_REVIEW, MAX_CHARS_BEFORE_REVIEW);
     let mistakeLog = [];
-
-    const startTyping = function () {
-        function typeNextCharacter() {
-            if (isPaused) {
-                remainingText = text.slice(i);
-                return;
-            }
-
-            if (i < text.length && session === currentTypingSession) {
-                // Simulate a typo with probability
-                const randomValue = Math.random();
-                const shouldMakeMistake = randomValue < mistakeProbability && text[i].match(/[a-zA-Z0-9]/);
-                
-                if (shouldMakeMistake) {
-                    // Decide if this mistake should be fixed immediately or delayed
-                    const isImmediate = Math.random() < (IMMEDIATE_FIX_PERCENTAGE / 100);
-                    const wrongChar = getRandomWrongChar(text[i]);
-                    let event = new KeyboardEvent("keydown", {key: wrongChar});
-                    activeElement.dispatchEvent(event);
-                    document.execCommand("insertText", false, wrongChar);
-                    // Log the mistake for possible delayed correction
-                    mistakeLog.push({pos: i, wrong: wrongChar, correct: text[i]});
-                    if (isImmediate) {
-                        // Immediate fix: short pause, then fix
-                        setTimeout(() => {
-                            // Backspace
-                            let backspaceEvent = new KeyboardEvent("keydown", {key: "Backspace"});
-                            activeElement.dispatchEvent(backspaceEvent);
-                            document.execCommand("delete", false, null);
-                            setTimeout(() => {
-                                // Type the correct character
-                                let correctEvent = new KeyboardEvent("keydown", {key: text[i]});
-                                activeElement.dispatchEvent(correctEvent);
-                                document.execCommand("insertText", false, text[i++]);
-                                // Remove from mistake log (since fixed)
-                                mistakeLog.pop();
-                                setTimeout(typeNextCharacter, baseDelay);
-                            }, getRandomInt(MIN_IMMEDIATE_FIX_PAUSE_MS, MAX_IMMEDIATE_FIX_PAUSE_MS));
-                        }, getRandomInt(MIN_IMMEDIATE_FIX_PAUSE_MS, MAX_IMMEDIATE_FIX_PAUSE_MS));
-                        return;
-                    } else {
-                        // Delayed fix: just continue typing, fix later
-                        i++;
-                        charsSinceLastReview++;
-                        setTimeout(typeNextCharacter, baseDelay);
-                        return;
-                    }
-                }
-
-                let event = new KeyboardEvent("keydown", {
-                    key: text[i],
-                    code: "Key" + text[i].toUpperCase(),
-                    charCode: text[i].charCodeAt(0),
-                    keyCode: text[i].charCodeAt(0),
-                    which: text[i].charCodeAt(0),
-                });
-
-                activeElement.dispatchEvent(event);
-                document.execCommand("insertText", false, text[i++]);
-                charsSinceLastReview++;
-
-                // Check if it's time for a review phase
-                if (charsSinceLastReview >= reviewCharThreshold && mistakeLog.length > 0) {
-                    setTimeout(() => {
-                        reviewAndFixMistakes(() => {
-                            charsSinceLastReview = 0;
-                            reviewCharThreshold = getRandomInt(MIN_CHARS_BEFORE_REVIEW, MAX_CHARS_BEFORE_REVIEW);
-                            setTimeout(typeNextCharacter, baseDelay);
-                        });
-                    }, getRandomInt(MIN_REVIEW_PAUSE_MS, MAX_REVIEW_PAUSE_MS));
-                    return;
-                }
-
-                let delay;
-                if (randomnessFactor <= 0) {
-                    delay = baseDelay;
-                } else {
-                    const variationPower = 1 + (randomnessFactor * 0.75);
-                    const minDelay = baseDelay * Math.max(0.15, 1 - Math.pow(randomnessFactor/variationPower, 1.2));
-                    const maxDelay = baseDelay * (1 + Math.pow(randomnessFactor*variationPower, 1.2)/2);
-                    delay = minDelay + Math.random() * (maxDelay - minDelay);
-                    const pauseProbability = 0.1 * Math.sqrt(randomnessFactor*variationPower);
-                    if (Math.random() < pauseProbability) {
-                        const pauseIntensity = Math.pow(randomnessFactor, variationPower/2);
-                        delay += (Math.random() * 1000 * pauseIntensity + 200) / speedFactor;
-                    }
-                }
-                setTimeout(typeNextCharacter, delay);
-            } else if (i >= text.length) {
-                // Typing completed
-                if (mistakeLog.length > 0) {
-                    console.log('[DEBUG] Final review phase triggered. mistakeLog:', JSON.stringify(mistakeLog));
-                    reviewAndFixMistakes(() => {
-                        console.log('[DEBUG] Final review phase complete. activeElement.value:', activeElement.value);
-                        // All mistakes fixed, typing session truly complete
-                    });
-                }
-            }
-        }
-        typeNextCharacter();
+    let fieldPos = getCaretPosition(activeElement);
+    let fieldStart = getTextLength(activeElement); // Track where this typing session starts
+    typingState = {
+        isPaused: false,
+        session,
+        text,
+        activeElement,
+        i,
+        baseDelay,
+        charsSinceLastReview,
+        reviewCharThreshold,
+        mistakeLog,
+        fieldPos,
+        fieldStart,
+        speedFactor,
+        randomnessFactor,
+        mistakeProbability,
+        phase: 'typing',
+        immediateFix: null,
+        review: null,
+        remainingText: '',
     };
     if (delayedStart) {
-        setTimeout(startTyping, 0);
+        setTimeout(() => proceedTyping(), 0);
     } else {
-        startTyping();
+        proceedTyping();
     }
-    // --- Helper for review phase ---
-    function reviewAndFixMistakes(callback) {
-        console.log('[DEBUG] Entering reviewAndFixMistakes. mistakeLog:', JSON.stringify(mistakeLog));
-        if (mistakeLog.length === 0) {
-            callback();
-            return;
-        }
-        // Randomly choose order: forward or backward
-        const order = Math.random() < 0.5 ? 'forward' : 'backward';
-        let indices = order === 'forward'
-            ? [...Array(mistakeLog.length).keys()]
-            : [...Array(mistakeLog.length).keys()].reverse();
-        let fixIndex = 0;
-        function fixNext() {
-            if (fixIndex >= indices.length) {
-                mistakeLog = [];
-                // Move caret to end
-                setCaretPosition(activeElement, getTextLength(activeElement));
-                console.log('[DEBUG] Finished reviewAndFixMistakes.');
-                callback();
+}
+
+function typeNextCharacter(state) {
+    if (state.isPaused || state.session !== currentTypingSession) {
+        state.remainingText = state.text.slice(state.i);
+        return;
+    }
+    if (state.i < state.text.length && state.session === currentTypingSession) {
+        const randomValue = Math.random();
+        const shouldMakeMistake = randomValue < state.mistakeProbability && state.text[state.i].match(/[a-zA-Z0-9]/);
+        if (shouldMakeMistake) {
+            const isImmediate = Math.random() < (IMMEDIATE_FIX_PERCENTAGE / 100);
+            const wrongChar = getRandomWrongChar(state.text[state.i]);
+            let event = new KeyboardEvent("keydown", {key: wrongChar});
+            state.activeElement.dispatchEvent(event);
+            document.execCommand("insertText", false, wrongChar);
+            state.mistakeLog.push({absPos: state.fieldStart + state.i, wrong: wrongChar, correct: state.text[state.i]});
+            logDebugState('After mistake', state);
+            state.fieldPos++;
+            if (isImmediate) {
+                state.phase = 'immediateFix';
+                state.immediateFix = {
+                    step: 0, // 0: backspace, 1: insert correct
+                    i: state.i,
+                };
+                setTimeout(() => proceedTyping(), getRandomInt(MIN_IMMEDIATE_FIX_PAUSE_MS, MAX_IMMEDIATE_FIX_PAUSE_MS));
+                return;
+            } else {
+                state.i++;
+                state.charsSinceLastReview++;
+                let delay = state.baseDelay;
+                setTimeout(() => proceedTyping(), delay);
                 return;
             }
-            const idx = indices[fixIndex];
-            const {pos, correct} = mistakeLog[idx];
-            // Move caret to position
-            setCaretPosition(activeElement, pos + 1); // +1 to be after the wrong char
-            // Backspace
-            stealthyBackspace(activeElement);
-            setTimeout(() => {
-                // Type the correct character
-                stealthyInsertText(activeElement, correct);
-                setTimeout(() => {
-                    fixIndex++;
-                    fixNext();
-                }, getRandomInt(MIN_BETWEEN_FIX_PAUSE_MS, MAX_BETWEEN_FIX_PAUSE_MS));
-            }, getRandomInt(MIN_BETWEEN_FIX_PAUSE_MS, MAX_BETWEEN_FIX_PAUSE_MS));
         }
-        console.log('[DEBUG] Before starting fixNext.');
-        fixNext();
+        let event = new KeyboardEvent("keydown", {
+            key: state.text[state.i],
+            code: "Key" + state.text[state.i].toUpperCase(),
+            charCode: state.text[state.i].charCodeAt(0),
+            keyCode: state.text[state.i].charCodeAt(0),
+            which: state.text[state.i].charCodeAt(0),
+        });
+        state.activeElement.dispatchEvent(event);
+        document.execCommand("insertText", false, state.text[state.i++]);
+        logDebugState('After character insert', state);
+        state.fieldPos++;
+        state.charsSinceLastReview++;
+        if (state.charsSinceLastReview >= state.reviewCharThreshold && state.mistakeLog.length > 0) {
+            state.phase = 'review';
+            state.review = {
+                order: Math.random() < 0.5 ? 'forward' : 'backward',
+                fixIndex: 0,
+            };
+            setTimeout(() => proceedTyping(), getRandomInt(MIN_REVIEW_PAUSE_MS, MAX_REVIEW_PAUSE_MS));
+            return;
+        }
+        let delay;
+        if (state.randomnessFactor <= 0) {
+            delay = state.baseDelay;
+        } else {
+            const variationPower = 1 + (state.randomnessFactor * 0.75);
+            const minDelay = state.baseDelay * Math.max(0.15, 1 - Math.pow(state.randomnessFactor/variationPower, 1.2));
+            const maxDelay = state.baseDelay * (1 + Math.pow(state.randomnessFactor*variationPower, 1.2)/2);
+            delay = minDelay + Math.random() * (maxDelay - minDelay);
+            const pauseProbability = 0.1 * Math.sqrt(state.randomnessFactor*variationPower);
+            if (Math.random() < pauseProbability) {
+                const pauseIntensity = Math.pow(state.randomnessFactor, variationPower/2);
+                delay += (Math.random() * 1000 * pauseIntensity + 200) / state.speedFactor;
+            }
+        }
+        setTimeout(() => proceedTyping(), delay);
+    } else if (state.i >= state.text.length) {
+        // Final review if any mistakes remain
+        if (state.mistakeLog.length > 0) {
+            logDebugState('Final review phase (end of typing)', state);
+            state.phase = 'review';
+            state.review = { order: Math.random() < 0.5 ? 'forward' : 'backward', fixIndex: 0, step: 0 };
+            doReviewFix(state, () => {
+                logDebugState('After final review phase', state);
+                clearTypingState();
+            });
+            return;
+        }
+        clearTypingState();
+        return;
+    }
+}
+
+function doImmediateFix(state) {
+    if (state.isPaused || state.session !== currentTypingSession) {
+        state.remainingText = state.text.slice(state.i);
+        return;
+    }
+    const fix = state.immediateFix;
+    if (fix.step === 0) {
+        setCaretPosition(state.activeElement, state.fieldPos);
+        let backspaceEvent = new KeyboardEvent("keydown", {key: "Backspace"});
+        state.activeElement.dispatchEvent(backspaceEvent);
+        document.execCommand("delete", false, null);
+        adjustMistakeLogPositions(state.mistakeLog, state.fieldPos);
+        logDebugState('After backspace (immediate fix)', state);
+        state.fieldPos--;
+        fix.step = 1;
+        setTimeout(() => proceedTyping(), getRandomInt(MIN_IMMEDIATE_FIX_PAUSE_MS, MAX_IMMEDIATE_FIX_PAUSE_MS));
+    } else if (fix.step === 1) {
+        let correctEvent = new KeyboardEvent("keydown", {key: state.text[fix.i]});
+        state.activeElement.dispatchEvent(correctEvent);
+        document.execCommand("insertText", false, state.text[state.i++]);
+        logDebugState('After correct insert (immediate fix)', state);
+        state.fieldPos++;
+        state.mistakeLog.pop();
+        state.phase = 'typing';
+        setTimeout(() => proceedTyping(), state.baseDelay);
+    }
+}
+
+// In doReviewFix, split each fix into two steps: backspace, then insert correct character. Track step in review state.
+function doReviewFix(state) {
+    if (state.isPaused || state.session !== currentTypingSession) {
+        state.remainingText = state.text.slice(state.i);
+        return;
+    }
+    const review = state.review;
+    let indices = review.order === 'forward'
+        ? [...Array(state.mistakeLog.length).keys()]
+        : [...Array(state.mistakeLog.length).keys()].reverse();
+    if (review.fixIndex >= indices.length) {
+        state.mistakeLog = [];
+        setCaretPosition(state.activeElement, getTextLength(state.activeElement));
+        logDebugState('After review phase complete', state);
+        state.phase = 'typing';
+        state.charsSinceLastReview = 0;
+        state.reviewCharThreshold = getRandomInt(MIN_CHARS_BEFORE_REVIEW, MAX_CHARS_BEFORE_REVIEW);
+        setTimeout(() => proceedTyping(), state.baseDelay);
+        return;
+    }
+    // Track step: 0 = backspace, 1 = insert correct
+    if (!('step' in review)) review.step = 0;
+    const idx = indices[review.fixIndex];
+    const {absPos, wrong, correct} = state.mistakeLog[idx];
+    let currentChar = getCharAtPosition(state.activeElement, absPos);
+    if (review.step === 0) {
+        if (currentChar !== wrong) {
+            review.fixIndex++;
+            review.step = 0;
+            setTimeout(() => proceedTyping(), 0);
+            return;
+        }
+        setCaretPosition(state.activeElement, absPos + 1);
+        stealthyBackspace(state.activeElement);
+        adjustMistakeLogPositions(state.mistakeLog, absPos);
+        logDebugState('After backspace (review fix)', state);
+        review.step = 1;
+        setTimeout(() => proceedTyping(), getRandomInt(MIN_BETWEEN_FIX_PAUSE_MS, MAX_BETWEEN_FIX_PAUSE_MS));
+    } else if (review.step === 1) {
+        setCaretPosition(state.activeElement, absPos);
+        stealthyInsertText(state.activeElement, correct);
+        logDebugState('After correct insert (review fix)', state);
+        review.fixIndex++;
+        review.step = 0;
+        setTimeout(() => proceedTyping(), 0);
     }
 }
 
@@ -266,6 +332,24 @@ function isTextInput(el) {
 }
 function isContentEditable(el) {
     return el && el.isContentEditable;
+}
+function logDebugState(label, state) {
+    const el = state && state.activeElement;
+    let content = '';
+    if (el) {
+        if (isTextInput(el)) content = el.value;
+        else if (isContentEditable(el)) content = el.innerText;
+    }
+    let caret = el ? getCaretPosition(el) : null;
+    console.log(`[DEBUG] ${label}`);
+    console.log('  Content:', JSON.stringify(content));
+    console.log('  Caret:', caret);
+    if (state) {
+        console.log('  i:', state.i, 'fieldPos:', state.fieldPos, 'phase:', state.phase);
+        console.log('  mistakeLog:', JSON.stringify(state.mistakeLog));
+        if (state.immediateFix) console.log('  immediateFix:', JSON.stringify(state.immediateFix));
+        if (state.review) console.log('  review:', JSON.stringify(state.review));
+    }
 }
 // Set caret position stealthily
 function setCaretPosition(el, pos) {
@@ -336,4 +420,41 @@ function getTextLength(el) {
     if (isTextInput(el)) return el.value.length;
     if (isContentEditable(el)) return el.innerText.length;
     return 0;
+}
+
+// Utility to get caret position in the field
+function getCaretPosition(el) {
+    if (isTextInput(el)) {
+        return el.selectionStart;
+    } else if (isContentEditable(el)) {
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0) return 0;
+        const range = selection.getRangeAt(0);
+        let preCaretRange = range.cloneRange();
+        preCaretRange.selectNodeContents(el);
+        preCaretRange.setEnd(range.endContainer, range.endOffset);
+        return preCaretRange.toString().length;
+    }
+    return 0;
+}
+
+// Utility: getCharAtPosition for both input/textarea and contenteditable
+function getCharAtPosition(el, pos) {
+    if (isTextInput(el)) {
+        return el.value.charAt(pos);
+    } else if (isContentEditable(el)) {
+        let text = el.innerText || el.textContent || "";
+        return text.charAt(pos);
+    }
+    return '';
+}
+
+// Utility to update mistakeLog positions after a fix
+function adjustMistakeLogPositions(mistakeLog, fixedAbsPos) {
+    for (let m of mistakeLog) {
+        if (m.absPos > fixedAbsPos) {
+            m.absPos--;
+        }
+    }
+    console.log('[DEBUG] mistakeLog positions adjusted after fix at', fixedAbsPos, JSON.stringify(mistakeLog));
 }
