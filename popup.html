@@ -17,7 +17,7 @@
       background-color: var(--background-color);
       color: var(--text-color);
       padding: 15px;
-      width: 220px;
+      width: 300px;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       -webkit-font-smoothing: antialiased;
       margin: 0;
@@ -154,8 +154,8 @@
       background-color: var(--background-color);
       padding: 20px;
       border: 1px solid var(--border-color);
-      width: 90%;
-      max-width: 280px;
+      width: 95%;
+      max-width: 300px;
       border-radius: 5px;
       box-shadow: 0 4px 8px rgba(0,0,0,0.2);
       transform: scale(0.95);
@@ -198,6 +198,15 @@
       color: white;
     }
 
+    .modal-btn-apply:disabled,
+    .modal-btn-apply.disabled {
+      background-color: #bfc9d1 !important;
+      color: #f4f4f4 !important;
+      cursor: not-allowed !important;
+      opacity: 0.7;
+      box-shadow: none;
+    }
+
     .menu-string-container {
       margin: 15px 0;
       width: 100%;
@@ -228,6 +237,133 @@
       color: #a0a0a0;
       font-size: 11px;
       margin: 4px 0;
+    }
+
+    .advanced-param {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 8px 0;
+      font-size: 13px;
+    }
+
+    .editable-value {
+      background-color: var(--highlight-color);
+      padding: 2px 6px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      color: var(--primary-color);
+      border: 1px solid transparent;
+      transition: all 0.2s;
+      min-width: 30px;
+      text-align: center;
+    }
+
+    .editable-value:hover {
+      border-color: var(--secondary-color);
+      background-color: #d4edda;
+    }
+
+    .editable-value:focus {
+      outline: none;
+      border-color: var(--secondary-color);
+      background-color: white;
+      box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+    }
+
+    /* Advanced Options Modal Specific Styles */
+    .advanced-modal {
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .advanced-modal .modal-content {
+      max-height: none;
+      overflow-y: visible;
+    }
+
+    .advanced-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0;
+      font-size: 12px;
+      border: 1px solid var(--border-color);
+      table-layout: fixed;
+    }
+
+    .advanced-table tr {
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .advanced-table tr:last-child {
+      border-bottom: none;
+    }
+
+    .advanced-table td {
+      padding: 3px 3px;
+      vertical-align: middle;
+      border-right: 1px solid var(--border-color);
+    }
+
+    .advanced-table td:first-child {
+      text-align: left;
+      font-weight: normal;
+      width: 65%;
+      background-color: #f8f9fa;
+    }
+
+    .advanced-table td:nth-child(2) {      
+      text-align: left;
+      border-right: none;
+      position: relative;
+    }
+
+    .advanced-table input {
+      width: 100%;
+      min-width: 0;
+      border: none;
+      background: transparent;
+      font-size: 12px;
+      text-align: right;
+      font-family: 'Courier New', monospace;
+    }
+
+    .advanced-table input:focus {
+      outline: none;
+      background-color: var(--highlight-color);
+    }
+
+    .restore-default-btn {
+      background: none;
+      border: none;
+      color: #e74c3c;
+      font-size: 12px;
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: 2px;
+      transition: all 0.2s;
+      display: none;
+      width: 16px;
+      height: 16px;
+      line-height: 1;
+      position: absolute;
+      right: -20px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    .restore-default-btn:hover {
+      background-color: #e74c3c;
+      color: white;
+    }
+
+    .input-container {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      min-height: 16px;
     }
   </style>
 </head>
@@ -285,8 +421,12 @@
     <button class="action-btn" id="shortcutsBtn">Keboard Shortcuts</button>
   </div>
 
-  <div class="section" style="border-bottom: none;">
+  <div class="section">
     <button class="action-btn" id="secondaryClickBtn">Use with Secondary Click</button>
+  </div>
+
+  <div class="section" style="border-bottom: none;">
+    <button class="action-btn" id="advancedOptionsBtn">Advanced Options</button>
   </div>
 
   <!-- Shortcuts Modal -->
@@ -344,6 +484,69 @@
       <div class="modal-buttons">
         <button class="modal-btn modal-btn-cancel" id="cancelMenuStringsBtn">Cancel</button>
         <button class="modal-btn modal-btn-apply" id="applyMenuStringsBtn">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Advanced Options Modal -->
+  <div id="advancedOptionsModal" class="modal">
+    <div class="modal-content advanced-modal">
+      <div class="modal-title">Advanced Options</div>
+      
+      <table class="advanced-table">
+        <tr>
+          <td title="Typing speed multiplier (higher = faster typing)">Typing Speed (%):</td>
+          <td><div class="input-container"><input type="number" id="advancedSpeedInput" min="10" max="200" value="100"></div></td>
+        </tr>
+        <tr>
+          <td title="Randomness of typing delays (higher = more variation in timing)">Randomness (%):</td>
+          <td><div class="input-container"><input type="number" id="advancedRandomnessInput" min="10" max="200" value="100"></div></td>
+        </tr>
+        <tr>
+          <td title="Probability of making typing mistakes (0-20%)">Mistake Probability (%):</td>
+          <td><div class="input-container"><input type="number" id="advancedMistakeInput" min="0" max="20" value="3"></div></td>
+        </tr>
+        <tr>
+          <td title="Percentage of mistakes fixed immediately vs. delayed">Immediate fix %:</td>
+          <td><div class="input-container"><input type="number" id="immediateFixPercentageInput" min="0" max="100" value="75"></div></td>
+        </tr>
+        <tr>
+          <td title="Minimum characters typed before triggering review phase">Min chars before review:</td>
+          <td><div class="input-container"><input type="number" id="minCharsBeforeReviewInput" min="1" max="50" value="5"></div></td>
+        </tr>
+        <tr>
+          <td title="Maximum characters typed before triggering review phase">Max chars before review:</td>
+          <td><div class="input-container"><input type="number" id="maxCharsBeforeReviewInput" min="1" max="50" value="15"></div></td>
+        </tr>
+        <tr>
+          <td title="Minimum pause duration before review phase (milliseconds)">Min review pause (ms):</td>
+          <td><div class="input-container"><input type="number" id="minReviewPauseInput" min="100" max="10000" value="1000"></div></td>
+        </tr>
+        <tr>
+          <td title="Maximum pause duration before review phase (milliseconds)">Max review pause (ms):</td>
+          <td><div class="input-container"><input type="number" id="maxReviewPauseInput" min="100" max="10000" value="3000"></div></td>
+        </tr>
+        <tr>
+          <td title="Minimum pause before immediate fix (milliseconds)">Min immediate fix pause (ms):</td>
+          <td><div class="input-container"><input type="number" id="minImmediateFixPauseInput" min="50" max="2000" value="100"></div></td>
+        </tr>
+        <tr>
+          <td title="Maximum pause before immediate fix (milliseconds)">Max immediate fix pause (ms):</td>
+          <td><div class="input-container"><input type="number" id="maxImmediateFixPauseInput" min="50" max="2000" value="400"></div></td>
+        </tr>
+        <tr>
+          <td title="Minimum pause between fixes during review (milliseconds)">Min between fixes pause (ms):</td>
+          <td><div class="input-container"><input type="number" id="minBetweenFixPauseInput" min="50" max="2000" value="100"></div></td>
+        </tr>
+        <tr>
+          <td title="Maximum pause between fixes during review (milliseconds)">Max between fixes pause (ms):</td>
+          <td><div class="input-container"><input type="number" id="maxBetweenFixPauseInput" min="50" max="2000" value="300"></div></td>
+        </tr>
+      </table>
+      
+      <div class="modal-buttons">
+        <button class="modal-btn modal-btn-cancel" id="cancelAdvancedOptionsBtn">Cancel</button>
+        <button class="modal-btn modal-btn-apply" id="applyAdvancedOptionsBtn">Apply</button>
       </div>
     </div>
   </div>

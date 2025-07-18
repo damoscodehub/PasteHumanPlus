@@ -172,7 +172,7 @@ function typeNextCharacter(state) {
                 return;
             }
         }
-        let event = new KeyboardEvent("keydown", {
+                let event = new KeyboardEvent("keydown", {
             key: state.text[state.i],
             code: "Key" + state.text[state.i].toUpperCase(),
             charCode: state.text[state.i].charCodeAt(0),
@@ -193,16 +193,16 @@ function typeNextCharacter(state) {
             setTimeout(() => proceedTyping(), getRandomInt(MIN_REVIEW_PAUSE_MS, MAX_REVIEW_PAUSE_MS));
             return;
         }
-        let delay;
+                let delay;
         if (state.randomnessFactor <= 0) {
             delay = state.baseDelay;
-        } else {
+                } else {
             const variationPower = 1 + (state.randomnessFactor * 0.75);
             const minDelay = state.baseDelay * Math.max(0.15, 1 - Math.pow(state.randomnessFactor/variationPower, 1.2));
             const maxDelay = state.baseDelay * (1 + Math.pow(state.randomnessFactor*variationPower, 1.2)/2);
-            delay = minDelay + Math.random() * (maxDelay - minDelay);
+                    delay = minDelay + Math.random() * (maxDelay - minDelay);
             const pauseProbability = 0.1 * Math.sqrt(state.randomnessFactor*variationPower);
-            if (Math.random() < pauseProbability) {
+                    if (Math.random() < pauseProbability) {
                 const pauseIntensity = Math.pow(state.randomnessFactor, variationPower/2);
                 delay += (Math.random() * 1000 * pauseIntensity + 200) / state.speedFactor;
             }
