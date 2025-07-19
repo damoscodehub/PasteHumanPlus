@@ -251,6 +251,14 @@ function emulateTyping(text, session, delayedStart, speedFactor = 1.0, randomnes
             callback();
             return;
         }
+        
+        // Safety timeout to prevent infinite loops
+        const safetyTimeout = setTimeout(() => {
+            console.log('[DEBUG] Safety timeout triggered, forcing review completion');
+            mistakeLog = [];
+            callback();
+        }, 10000); // 10 seconds timeout
+        
         // Randomly choose order: forward or backward
         const order = Math.random() < 0.5 ? 'forward' : 'backward';
         let indices = order === 'forward'
@@ -258,7 +266,9 @@ function emulateTyping(text, session, delayedStart, speedFactor = 1.0, randomnes
             : [...Array(mistakeLog.length).keys()].reverse();
         let fixIndex = 0;
         function fixNext() {
+            console.log(`[DEBUG] fixNext called with fixIndex: ${fixIndex}, indices.length: ${indices.length}`);
             if (fixIndex >= indices.length) {
+                clearTimeout(safetyTimeout);
                 mistakeLog = [];
                 // Move caret to end
                 setCaretPosition(activeElement, getTextLength(activeElement));
@@ -268,16 +278,24 @@ function emulateTyping(text, session, delayedStart, speedFactor = 1.0, randomnes
             }
             const idx = indices[fixIndex];
             const {pos, correct} = mistakeLog[idx];
+            console.log(`[DEBUG] Fixing mistake at pos ${pos}: "${mistakeLog[idx].wrong}" -> "${correct}"`);
+            
             // Move caret to position using arrow keys
             const currentPos = getCaretPosition(activeElement);
+            console.log(`[DEBUG] Moving caret from ${currentPos} to ${pos + 1}`);
             navigateWithArrowKeys(activeElement, pos + 1, currentPos, advancedSettings.allowSelection, advancedSettings.allowWordNavigation);
+            
             // Backspace
+            console.log('[DEBUG] Performing backspace');
             stealthyBackspace(activeElement);
+            
             setTimeout(() => {
                 // Type the correct character
+                console.log(`[DEBUG] Inserting correct character: "${correct}"`);
                 stealthyInsertText(activeElement, correct);
                 setTimeout(() => {
                     fixIndex++;
+                    console.log(`[DEBUG] Moving to next fix, fixIndex: ${fixIndex}`);
                     fixNext();
                 }, getRandomInt(MIN_BETWEEN_FIX_PAUSE_MS, MAX_BETWEEN_FIX_PAUSE_MS));
             }, getRandomInt(MIN_BETWEEN_FIX_PAUSE_MS, MAX_BETWEEN_FIX_PAUSE_MS));
@@ -387,5 +405,21 @@ function getRandomInt(min, max) {
 function getTextLength(el) {
     if (isTextInput(el)) return el.value.length;
     if (isContentEditable(el)) return el.innerText.length;
+    return 0;
+}
+
+// Utility to get caret position in the field
+function getCaretPosition(el) {
+    if (isTextInput(el)) {
+        return el.selectionStart;
+    } else if (isContentEditable(el)) {
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0) return 0;
+        const range = selection.getRangeAt(0);
+        let preCaretRange = range.cloneRange();
+        preCaretRange.selectNodeContents(el);
+        preCaretRange.setEnd(range.endContainer, range.endOffset);
+        return preCaretRange.toString().length;
+    }
     return 0;
 }
