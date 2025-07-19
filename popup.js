@@ -22,9 +22,10 @@ const DEFAULT_VALUES = {
   minImmediateFixPause: 100,
   maxImmediateFixPause: 400,
   minBetweenFixPause: 100,
-  maxBetweenFixPause: 300
+  maxBetweenFixPause: 300,
+  allowSelection: true,
+  allowWordNavigation: true
 };
-
 // Advanced settings defaults
 let advancedSettings = {
   immediateFixPercentage: DEFAULT_VALUES.immediateFixPercentage,
@@ -35,12 +36,12 @@ let advancedSettings = {
   minImmediateFixPause: DEFAULT_VALUES.minImmediateFixPause,
   maxImmediateFixPause: DEFAULT_VALUES.maxImmediateFixPause,
   minBetweenFixPause: DEFAULT_VALUES.minBetweenFixPause,
-  maxBetweenFixPause: DEFAULT_VALUES.maxBetweenFixPause
+  maxBetweenFixPause: DEFAULT_VALUES.maxBetweenFixPause,
+  allowSelection: DEFAULT_VALUES.allowSelection,
+  allowWordNavigation: DEFAULT_VALUES.allowWordNavigation
 };
-
 // Store snapshot of advanced options when modal opens
 let advancedOptionsSnapshot = null;
-
 function getCurrentAdvancedOptions() {
   return {
     speedFactor: speedFactor,
@@ -54,17 +55,19 @@ function getCurrentAdvancedOptions() {
     minImmediateFixPause: advancedSettings.minImmediateFixPause,
     maxImmediateFixPause: advancedSettings.maxImmediateFixPause,
     minBetweenFixPause: advancedSettings.minBetweenFixPause,
-    maxBetweenFixPause: advancedSettings.maxBetweenFixPause
+    maxBetweenFixPause: advancedSettings.maxBetweenFixPause,
+    allowSelection: advancedSettings.allowSelection,
+    allowWordNavigation: advancedSettings.allowWordNavigation
   };
 }
 
 function isAdvancedOptionsChanged() {
   if (!advancedOptionsSnapshot) return false;
   const current = getCurrentAdvancedOptions();
-  for (const key in current) {
+for (const key in current) {
     if (current[key] !== advancedOptionsSnapshot[key]) {
       return true;
-    }
+}
   }
   return false;
 }
@@ -72,13 +75,13 @@ function isAdvancedOptionsChanged() {
 function updateApplyAdvancedOptionsBtnState() {
   const btn = elements.applyAdvancedOptionsBtn;
   if (!btn) return;
-  if (isAdvancedOptionsChanged()) {
+if (isAdvancedOptionsChanged()) {
     btn.disabled = false;
     btn.classList.remove('disabled');
   } else {
     btn.disabled = true;
     btn.classList.add('disabled');
-  }
+}
 }
 
 // DOM elements
@@ -114,7 +117,8 @@ const elements = {
   cancelAdvancedOptionsBtn: document.getElementById('cancelAdvancedOptionsBtn'),
   applyAdvancedOptionsBtn: document.getElementById('applyAdvancedOptionsBtn'),
   shortcutsLink: document.getElementById('shortcutsLink'),
-  mistakeInput: document.getElementById('mistakeInput'),
+  
+mistakeInput: document.getElementById('mistakeInput'),
   mistakeSlider: document.getElementById('mistakeSlider'),
   decreaseMistake: document.getElementById('decreaseMistake'),
   increaseMistake: document.getElementById('increaseMistake'),
@@ -130,20 +134,21 @@ const elements = {
   minImmediateFixPauseInput: document.getElementById('minImmediateFixPauseInput'),
   maxImmediateFixPauseInput: document.getElementById('maxImmediateFixPauseInput'),
   minBetweenFixPauseInput: document.getElementById('minBetweenFixPauseInput'),
-  maxBetweenFixPauseInput: document.getElementById('maxBetweenFixPauseInput')
+  maxBetweenFixPauseInput: document.getElementById('maxBetweenFixPauseInput'),
+  allowSelectionInput: document.getElementById('allowSelectionInput'),
+  allowWordNavigationInput: document.getElementById('allowWordNavigationInput')
 };
-
 // Helper functions for modal animations
 function showModal(modal) {
   modal.style.display = 'flex';
-  setTimeout(() => {
+setTimeout(() => {
     modal.classList.add('show');
   }, 10);
 }
 
 function hideModal(modal) {
   modal.classList.remove('show');
-  setTimeout(() => {
+setTimeout(() => {
     modal.style.display = 'none';
   }, 150);
 }
@@ -154,7 +159,6 @@ document.addEventListener('DOMContentLoaded', function() {
   loadSettings();
   setupEventListeners();
 });
-
 function loadSettings() {
   chrome.storage.local.get(['speedFactor', 'randomnessFactor', 'mistakeProbability', 'menuStrings', 'advancedSettings'], function(result) {
     if (result.speedFactor !== undefined) {
@@ -170,7 +174,8 @@ function loadSettings() {
       menuStrings = result.menuStrings;
     }
     if (result.advancedSettings) {
-      advancedSettings = {...advancedSettings, ...result.advancedSettings};
+      
+advancedSettings = {...advancedSettings, ...result.advancedSettings};
     }
     updateSpeedDisplay();
     updateRandomnessDisplay();
@@ -193,6 +198,19 @@ function loadAdvancedSettings() {
 function saveAdvancedSettings() {
   chrome.storage.local.set({advancedSettings: advancedSettings}, function() {
     console.log('Advanced settings saved');
+    // Send updated settings to content script
+    sendAdvancedSettingsToContent();
+  });
+}
+
+function sendAdvancedSettingsToContent() {
+  chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+    if (tabs[0]) {
+      chrome.tabs.sendMessage(tabs[0].id, {
+        action: 'updateAdvancedSettings',
+        settings: advancedSettings
+      });
+    }
   });
 }
 
@@ -200,46 +218,52 @@ function updateAdvancedDisplay() {
   // Update advanced speed controls
   if (elements.advancedSpeedInput) {
     elements.advancedSpeedInput.value = Math.round(speedFactor * 100);
-  }
+}
   
   // Update advanced randomness controls
   if (elements.advancedRandomnessInput) {
     elements.advancedRandomnessInput.value = Math.round(randomnessFactor * 100);
-  }
+}
   
   // Update advanced mistake controls
   if (elements.advancedMistakeInput) {
     elements.advancedMistakeInput.value = Math.round(mistakeProbability * 100);
-  }
+}
   
   // Update editable values
   if (elements.immediateFixPercentageInput) {
     elements.immediateFixPercentageInput.value = advancedSettings.immediateFixPercentage;
-  }
+}
   if (elements.minCharsBeforeReviewInput) {
     elements.minCharsBeforeReviewInput.value = advancedSettings.minCharsBeforeReview;
-  }
+}
   if (elements.maxCharsBeforeReviewInput) {
     elements.maxCharsBeforeReviewInput.value = advancedSettings.maxCharsBeforeReview;
-  }
+}
   if (elements.minReviewPauseInput) {
     elements.minReviewPauseInput.value = advancedSettings.minReviewPause;
-  }
+}
   if (elements.maxReviewPauseInput) {
     elements.maxReviewPauseInput.value = advancedSettings.maxReviewPause;
-  }
+}
   if (elements.minImmediateFixPauseInput) {
     elements.minImmediateFixPauseInput.value = advancedSettings.minImmediateFixPause;
-  }
+}
   if (elements.maxImmediateFixPauseInput) {
     elements.maxImmediateFixPauseInput.value = advancedSettings.maxImmediateFixPause;
-  }
+}
   if (elements.minBetweenFixPauseInput) {
     elements.minBetweenFixPauseInput.value = advancedSettings.minBetweenFixPause;
-  }
+}
   if (elements.maxBetweenFixPauseInput) {
     elements.maxBetweenFixPauseInput.value = advancedSettings.maxBetweenFixPause;
-  }
+}
+  if (elements.allowSelectionInput) {
+    elements.allowSelectionInput.checked = advancedSettings.allowSelection;
+}
+  if (elements.allowWordNavigationInput) {
+    elements.allowWordNavigationInput.checked = advancedSettings.allowWordNavigation;
+}
   
   // Update restore buttons after updating all values
   updateRestoreButtons();
@@ -248,8 +272,7 @@ function updateAdvancedDisplay() {
 // Make editable values clickable and editable
 function makeEditable(element, settingKey, min = 0, max = 9999, isSpeedRandomness = false) {
   if (!element) return;
-  
-  element.addEventListener('click', function() {
+element.addEventListener('click', function() {
     let currentValue;
     if (isSpeedRandomness) {
       if (settingKey === 'speedFactor') {
@@ -260,7 +283,8 @@ function makeEditable(element, settingKey, min = 0, max = 9999, isSpeedRandomnes
         currentValue = Math.round(mistakeProbability * 100);
       }
     } else {
-      currentValue = parseInt(element.value);
+     
+ currentValue = parseInt(element.value);
     }
     
     const input = document.createElement('input');
@@ -276,41 +300,42 @@ function makeEditable(element, settingKey, min = 0, max = 9999, isSpeedRandomnes
       font-family: inherit;
       font-size: inherit;
       text-align: center;
-      background: white;
+ 
+     background: white;
     `;
     
     element.style.display = 'none';
     element.parentNode.insertBefore(input, element);
-    input.focus();
+input.focus();
     input.select();
     
     function finishEdit() {
       const newValue = parseInt(input.value);
-      if (!isNaN(newValue) && newValue >= min && newValue <= max) {
+if (!isNaN(newValue) && newValue >= min && newValue <= max) {
         if (isSpeedRandomness) {
           if (settingKey === 'speedFactor') {
             speedFactor = newValue / 100;
-            saveSpeedFactor();
+saveSpeedFactor();
           } else if (settingKey === 'randomnessFactor') {
             randomnessFactor = newValue / 100;
-            saveRandomnessFactor();
+saveRandomnessFactor();
           } else if (settingKey === 'mistakeProbability') {
             mistakeProbability = newValue / 100;
-            saveMistakeProbability();
+saveMistakeProbability();
           }
         } else {
           advancedSettings[settingKey] = newValue;
-        }
+}
         element.value = newValue;
-      } else {
+} else {
         element.value = currentValue;
-      }
+}
       element.style.display = 'inline';
       input.remove();
     }
     
     input.addEventListener('blur', finishEdit);
-    input.addEventListener('keydown', function(e) {
+input.addEventListener('keydown', function(e) {
       if (e.key === 'Enter') {
         finishEdit();
       } else if (e.key === 'Escape') {
@@ -319,13 +344,14 @@ function makeEditable(element, settingKey, min = 0, max = 9999, isSpeedRandomnes
         input.remove();
       }
     });
-  });
+});
 }
 
 // Helper functions for restore default functionality
 function isValueDifferentFromDefault(currentValue, defaultValue, isPercentage = false) {
   if (isPercentage) {
-    return Math.abs(currentValue - defaultValue) > 0.001; // Small tolerance for floating point
+    return Math.abs(currentValue - defaultValue) > 0.001;
+// Small tolerance for floating point
   }
   return currentValue !== defaultValue;
 }
@@ -334,40 +360,39 @@ function getCurrentValue(settingKey) {
   switch(settingKey) {
     case 'speedFactor':
       return speedFactor;
-    case 'randomnessFactor':
+case 'randomnessFactor':
       return randomnessFactor;
     case 'mistakeProbability':
       return mistakeProbability;
-    default:
+default:
       return advancedSettings[settingKey];
   }
 }
 
 function restoreDefaultValue(settingKey) {
   const defaultValue = DEFAULT_VALUES[settingKey];
-  
-  switch(settingKey) {
+switch(settingKey) {
     case 'speedFactor':
       speedFactor = defaultValue;
       saveSpeedFactor();
       break;
-    case 'randomnessFactor':
+case 'randomnessFactor':
       randomnessFactor = defaultValue;
       saveRandomnessFactor();
       break;
-    case 'mistakeProbability':
+case 'mistakeProbability':
       mistakeProbability = defaultValue;
       saveMistakeProbability();
       break;
-    default:
+default:
       advancedSettings[settingKey] = defaultValue;
       // Update the input field immediately
       const inputElement = elements[settingKey + 'Input'];
-      if (inputElement) {
+if (inputElement) {
         inputElement.value = defaultValue;
       }
       break;
-  }
+}
   
   updateAdvancedDisplay();
   updateRestoreButtons();
@@ -377,19 +402,21 @@ function restoreDefaultValue(settingKey) {
 function updateRestoreButtons() {
   // Update restore buttons for main parameters
   updateRestoreButton('speedFactor', elements.advancedSpeedInput, true);
-  updateRestoreButton('randomnessFactor', elements.advancedRandomnessInput, true);
+updateRestoreButton('randomnessFactor', elements.advancedRandomnessInput, true);
   updateRestoreButton('mistakeProbability', elements.advancedMistakeInput, true);
   
   // Update restore buttons for advanced parameters
   updateRestoreButton('immediateFixPercentage', elements.immediateFixPercentageInput);
   updateRestoreButton('minCharsBeforeReview', elements.minCharsBeforeReviewInput);
   updateRestoreButton('maxCharsBeforeReview', elements.maxCharsBeforeReviewInput);
-  updateRestoreButton('minReviewPause', elements.minReviewPauseInput);
+updateRestoreButton('minReviewPause', elements.minReviewPauseInput);
   updateRestoreButton('maxReviewPause', elements.maxReviewPauseInput);
   updateRestoreButton('minImmediateFixPause', elements.minImmediateFixPauseInput);
   updateRestoreButton('maxImmediateFixPause', elements.maxImmediateFixPauseInput);
   updateRestoreButton('minBetweenFixPause', elements.minBetweenFixPauseInput);
   updateRestoreButton('maxBetweenFixPause', elements.maxBetweenFixPauseInput);
+  updateRestoreButton('allowSelection', elements.allowSelectionInput);
+  updateRestoreButton('allowWordNavigation', elements.allowWordNavigationInput);
 }
 
 function updateRestoreButton(settingKey, inputElement, isPercentage = false) {
@@ -397,34 +424,31 @@ function updateRestoreButton(settingKey, inputElement, isPercentage = false) {
   
   const currentValue = getCurrentValue(settingKey);
   const defaultValue = DEFAULT_VALUES[settingKey];
-  const isDifferent = isValueDifferentFromDefault(currentValue, defaultValue, isPercentage);
+const isDifferent = isValueDifferentFromDefault(currentValue, defaultValue, isPercentage);
   
   // Find the table cell that contains the input
   const tableCell = inputElement.closest('td');
-  if (!tableCell) return;
+if (!tableCell) return;
   
   // Find or create the restore button
   let restoreButton = tableCell.querySelector('.restore-default-btn');
-  
-  if (isDifferent) {
+if (isDifferent) {
     if (!restoreButton) {
       restoreButton = document.createElement('button');
       restoreButton.className = 'restore-default-btn';
-      restoreButton.innerHTML = '↺';
+restoreButton.innerHTML = '↺';
       restoreButton.title = `Value changed from default (${defaultValue}${isPercentage ? '%' : ''}). Click to restore default.`;
-      
-      restoreButton.addEventListener('click', function(e) {
+restoreButton.addEventListener('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
         restoreDefaultValue(settingKey);
       });
-      
-      tableCell.appendChild(restoreButton);
+tableCell.appendChild(restoreButton);
     }
     restoreButton.style.display = 'inline-block';
   } else if (restoreButton) {
     restoreButton.style.display = 'none';
-  }
+}
 }
 
 function loadShortcuts() {
@@ -435,8 +459,7 @@ function loadShortcuts() {
     toggleValue: !!elements.toggleValue,
     activateValue: !!elements.activateValue
   });
-
-  chrome.commands.getAll(function(commands) {
+chrome.commands.getAll(function(commands) {
     console.log('Retrieved commands:', commands);
 
     commands.forEach(command => {
@@ -449,7 +472,8 @@ function loadShortcuts() {
           }
           break;
         case 'start_typing':
-          if (elements.startValue) {
+   
+       if (elements.startValue) {
             elements.startValue.textContent = command.shortcut || 'Not set';
           }
           break;
@@ -457,7 +481,8 @@ function loadShortcuts() {
           if (elements.stopValue) {
             elements.stopValue.textContent = command.shortcut || 'Not set';
           }
-          break;
+      
+    break;
         case 'toggle_typing':
           if (elements.toggleValue) {
             elements.toggleValue.textContent = command.shortcut || 'Not set';
@@ -474,8 +499,7 @@ function setupEventListeners() {
   elements.increaseSpeed.addEventListener('click', increaseSpeed);
   elements.speedInput.addEventListener('change', handleSpeedInputChange);
   elements.speedSlider.addEventListener('input', handleSpeedSliderChange);
-  
-  // Randomness controls
+// Randomness controls
   elements.decreaseRandomness.addEventListener('click', decreaseRandomness);
   elements.increaseRandomness.addEventListener('click', increaseRandomness);
   elements.randomnessInput.addEventListener('change', handleRandomnessInputChange);
@@ -484,15 +508,14 @@ function setupEventListeners() {
   // Mistake controls
   elements.decreaseMistake.addEventListener('click', decreaseMistake);
   elements.increaseMistake.addEventListener('click', increaseMistake);
-  elements.mistakeInput.addEventListener('change', handleMistakeInputChange);
+elements.mistakeInput.addEventListener('change', handleMistakeInputChange);
   elements.mistakeSlider.addEventListener('input', handleMistakeSliderChange);
   
   // Shortcuts button
   elements.shortcutsBtn.addEventListener('click', function() {
     showModal(elements.shortcutsModal);
   });
-  
-  // Secondary click button
+// Secondary click button
   elements.secondaryClickBtn.addEventListener('click', function() {
     elements.mainMenuInput.value = menuStrings.main;
     elements.startMenuInput.value = menuStrings.start;
@@ -500,8 +523,7 @@ function setupEventListeners() {
     elements.stopMenuInput.value = menuStrings.stop;
     showModal(elements.menuStringsModal);
   });
-  
-  // Advanced options button
+// Advanced options button
   elements.advancedOptionsBtn.addEventListener('click', function() {
     loadAdvancedSettings();
     showModal(elements.advancedOptionsModal);
@@ -509,8 +531,7 @@ function setupEventListeners() {
     advancedOptionsSnapshot = getCurrentAdvancedOptions();
     updateApplyAdvancedOptionsBtnState();
   });
-  
-  // Advanced speed controls
+// Advanced speed controls
   if (elements.advancedSpeedInput) {
     elements.advancedSpeedInput.addEventListener('change', function() {
       let newValue = parseInt(elements.advancedSpeedInput.value);
@@ -521,7 +542,7 @@ function setupEventListeners() {
       }
       updateApplyAdvancedOptionsBtnState();
     });
-  }
+}
   
   // Advanced randomness controls
   if (elements.advancedRandomnessInput) {
@@ -534,7 +555,7 @@ function setupEventListeners() {
       }
       updateApplyAdvancedOptionsBtnState();
     });
-  }
+}
   
   // Advanced mistake controls
   if (elements.advancedMistakeInput) {
@@ -547,14 +568,14 @@ function setupEventListeners() {
       }
       updateApplyAdvancedOptionsBtnState();
     });
-  }
+}
   
   // Advanced options modal buttons
   if (elements.cancelAdvancedOptionsBtn) {
     elements.cancelAdvancedOptionsBtn.addEventListener('click', function() {
       hideModal(elements.advancedOptionsModal);
     });
-  }
+}
   
   if (elements.applyAdvancedOptionsBtn) {
     elements.applyAdvancedOptionsBtn.addEventListener('click', function() {
@@ -563,7 +584,7 @@ function setupEventListeners() {
       advancedOptionsSnapshot = getCurrentAdvancedOptions();
       updateApplyAdvancedOptionsBtnState();
     });
-  }
+}
   
   // Advanced parameter input listeners
   if (elements.immediateFixPercentageInput) {
@@ -575,7 +596,7 @@ function setupEventListeners() {
       }
       updateApplyAdvancedOptionsBtnState();
     });
-  }
+}
   
   if (elements.minCharsBeforeReviewInput) {
     elements.minCharsBeforeReviewInput.addEventListener('change', function() {
@@ -586,7 +607,7 @@ function setupEventListeners() {
       }
       updateApplyAdvancedOptionsBtnState();
     });
-  }
+}
   
   if (elements.maxCharsBeforeReviewInput) {
     elements.maxCharsBeforeReviewInput.addEventListener('change', function() {
@@ -597,7 +618,7 @@ function setupEventListeners() {
       }
       updateApplyAdvancedOptionsBtnState();
     });
-  }
+}
   
   if (elements.minReviewPauseInput) {
     elements.minReviewPauseInput.addEventListener('change', function() {
@@ -608,7 +629,7 @@ function setupEventListeners() {
       }
       updateApplyAdvancedOptionsBtnState();
     });
-  }
+}
   
   if (elements.maxReviewPauseInput) {
     elements.maxReviewPauseInput.addEventListener('change', function() {
@@ -619,7 +640,7 @@ function setupEventListeners() {
       }
       updateApplyAdvancedOptionsBtnState();
     });
-  }
+}
   
   if (elements.minImmediateFixPauseInput) {
     elements.minImmediateFixPauseInput.addEventListener('change', function() {
@@ -630,7 +651,7 @@ function setupEventListeners() {
       }
       updateApplyAdvancedOptionsBtnState();
     });
-  }
+}
   
   if (elements.maxImmediateFixPauseInput) {
     elements.maxImmediateFixPauseInput.addEventListener('change', function() {
@@ -641,7 +662,7 @@ function setupEventListeners() {
       }
       updateApplyAdvancedOptionsBtnState();
     });
-  }
+}
   
   if (elements.minBetweenFixPauseInput) {
     elements.minBetweenFixPauseInput.addEventListener('change', function() {
@@ -652,7 +673,7 @@ function setupEventListeners() {
       }
       updateApplyAdvancedOptionsBtnState();
     });
-  }
+}
   
   if (elements.maxBetweenFixPauseInput) {
     elements.maxBetweenFixPauseInput.addEventListener('change', function() {
@@ -663,7 +684,23 @@ function setupEventListeners() {
       }
       updateApplyAdvancedOptionsBtnState();
     });
-  }
+}
+  
+  if (elements.allowSelectionInput) {
+    elements.allowSelectionInput.addEventListener('change', function() {
+      advancedSettings.allowSelection = elements.allowSelectionInput.checked;
+      updateRestoreButton('allowSelection', elements.allowSelectionInput);
+      updateApplyAdvancedOptionsBtnState();
+    });
+}
+  
+  if (elements.allowWordNavigationInput) {
+    elements.allowWordNavigationInput.addEventListener('change', function() {
+      advancedSettings.allowWordNavigation = elements.allowWordNavigationInput.checked;
+      updateRestoreButton('allowWordNavigation', elements.allowWordNavigationInput);
+      updateApplyAdvancedOptionsBtnState();
+    });
+}
   
   // Shortcuts link
   elements.shortcutsLink.addEventListener('click', function(e) {
@@ -671,13 +708,11 @@ function setupEventListeners() {
     chrome.tabs.create({url: 'chrome://extensions/shortcuts'});
     hideModal(elements.shortcutsModal);
   });
-  
-  // Menu strings modal buttons
+// Menu strings modal buttons
   elements.cancelMenuStringsBtn.addEventListener('click', function() {
     hideModal(elements.menuStringsModal);
   });
-  
-  elements.applyMenuStringsBtn.addEventListener('click', function() {
+elements.applyMenuStringsBtn.addEventListener('click', function() {
     menuStrings = {
       main: elements.mainMenuInput.value || "v",
       start: elements.startMenuInput.value || ">",
@@ -691,8 +726,7 @@ function setupEventListeners() {
       hideModal(elements.menuStringsModal);
     });
   });
-  
-  // Close modals when clicking outside
+// Close modals when clicking outside
   window.addEventListener('click', function(event) {
     if (event.target === elements.shortcutsModal) {
       hideModal(elements.shortcutsModal);
@@ -723,31 +757,31 @@ function updateContextMenu() {
 // Speed control functions
 function decreaseSpeed() {
   let value = Math.max(10, Math.floor(speedFactor * 100));
-  if (value % 10 === 0 && value > 10) {
+if (value % 10 === 0 && value > 10) {
     value -= 10;
-  } else {
+} else {
     value = Math.floor(value / 10) * 10;
   }
   speedFactor = value / 100;
-  saveSpeedFactor();
+saveSpeedFactor();
 }
 
 function increaseSpeed() {
   let value = Math.min(200, Math.floor(speedFactor * 100));
-  if (value % 10 === 0 && value < 200) {
+if (value % 10 === 0 && value < 200) {
     value += 10;
-  } else {
+} else {
     value = Math.ceil(value / 10) * 10;
   }
   speedFactor = value / 100;
-  saveSpeedFactor();
+saveSpeedFactor();
 }
 
 function handleSpeedInputChange() {
   let value = parseInt(elements.speedInput.value);
   if (isNaN(value)) value = 100;
   value = Math.max(10, Math.min(200, value));
-  speedFactor = value / 100;
+speedFactor = value / 100;
   saveSpeedFactor();
 }
 
@@ -777,13 +811,15 @@ function updateSpeedDisplay() {
 
 // Randomness control functions
 function decreaseRandomness() {
-  let value = Math.max(0, Math.floor(randomnessFactor * 100) - 10); // Simple -10 with floor at 0
+  let value = Math.max(0, Math.floor(randomnessFactor * 100) - 10);
+// Simple -10 with floor at 0
   randomnessFactor = value / 100;
   saveRandomnessFactor();
 }
 
 function increaseRandomness() {
-  let value = Math.min(200, Math.floor(randomnessFactor * 100) + 10); // Simple +10 with ceiling at 200
+  let value = Math.min(200, Math.floor(randomnessFactor * 100) + 10);
+// Simple +10 with ceiling at 200
   randomnessFactor = value / 100;
   saveRandomnessFactor();
 }
@@ -792,7 +828,7 @@ function handleRandomnessInputChange() {
   let value = parseInt(elements.randomnessInput.value);
   if (isNaN(value)) value = 100;
   value = Math.max(0, Math.min(200, value));
-  randomnessFactor = value / 100;
+randomnessFactor = value / 100;
   saveRandomnessFactor();
 }
 
@@ -823,29 +859,29 @@ function updateRandomnessDisplay() {
 // Mistake control functions
 function decreaseMistake() {
   let value = Math.max(0, Math.floor(mistakeProbability * 100) - 1);
-  mistakeProbability = value / 100;
+mistakeProbability = value / 100;
   saveMistakeProbability();
 }
 function increaseMistake() {
   let value = Math.min(20, Math.floor(mistakeProbability * 100) + 1);
-  mistakeProbability = value / 100;
+mistakeProbability = value / 100;
   saveMistakeProbability();
 }
 function handleMistakeInputChange() {
   let value = parseInt(elements.mistakeInput.value);
   if (isNaN(value)) value = 3;
-  value = Math.max(0, Math.min(20, value));
+value = Math.max(0, Math.min(20, value));
   mistakeProbability = value / 100;
   saveMistakeProbability();
 }
 function handleMistakeSliderChange() {
   mistakeProbability = parseInt(elements.mistakeSlider.value) / 100;
-  updateMistakeDisplay();
+updateMistakeDisplay();
   saveMistakeProbability();
 }
 function saveMistakeProbability() {
   console.log('popup.js: Saving mistake probability:', mistakeProbability);
-  chrome.storage.local.set({mistakeProbability: mistakeProbability}, function() {
+chrome.storage.local.set({mistakeProbability: mistakeProbability}, function() {
     updateMistakeDisplay();
     chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
       chrome.tabs.sendMessage(tabs[0].id, {
