@@ -85,40 +85,34 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
     }
 });
 
-// Arrow key navigation function
-function navigateWithArrowKeys(el, targetPos, currentPos, allowSelection = false, allowWordNavigation = false) {
+// Arrow key navigation function (async, stepwise, human-like)
+async function navigateWithArrowKeys(el, targetPos, currentPos, allowSelection = false, allowWordNavigation = false) {
     const steps = Math.abs(targetPos - currentPos);
     if (steps === 0) return;
-    
     const direction = currentPos < targetPos ? 'right' : 'left';
     const key = direction === 'right' ? 'ArrowRight' : 'ArrowLeft';
-    
-    console.log(`[DEBUG] Arrow navigation: ${currentPos} -> ${targetPos} (${direction}), Selection: ${allowSelection}, Word: ${allowWordNavigation}`);
-    
-    // Create keyboard event with modifiers
-    const eventOptions = {
-        key: key,
-        code: key,
-        keyCode: direction === 'right' ? 39 : 37,
-        which: direction === 'right' ? 39 : 37,
-        bubbles: true,
-        cancelable: true
-    };
-    
-    // Add modifiers if needed
-    if (allowSelection) {
-        eventOptions.shiftKey = true;
+    const keyCode = direction === 'right' ? 39 : 37;
+    const stepDelay = getRandomInt(30, 80); // ms between arrow presses
+    let pos = currentPos;
+    for (let i = 0; i < steps; i++) {
+        const eventOptions = {
+            key: key,
+            code: key,
+            keyCode: keyCode,
+            which: keyCode,
+            bubbles: true,
+            cancelable: true
+        };
+        if (allowSelection) eventOptions.shiftKey = true;
+        if (allowWordNavigation) eventOptions.ctrlKey = true;
+        const event = new KeyboardEvent('keydown', eventOptions);
+        el.dispatchEvent(event);
+        // Move caret one step
+        pos += (direction === 'right' ? 1 : -1);
+        setCaretPosition(el, pos);
+        console.log(`[DEBUG] Arrow navigation step ${i+1}/${steps}: pos=${pos}`);
+        await new Promise(res => setTimeout(res, stepDelay));
     }
-    if (allowWordNavigation) {
-        eventOptions.ctrlKey = true;
-    }
-    
-    // Simulate the arrow key press
-    const event = new KeyboardEvent('keydown', eventOptions);
-    el.dispatchEvent(event);
-    
-    // Update caret position directly for immediate effect
-    setCaretPosition(el, targetPos);
 }
 
 window.addEventListener("keydown", function (event) {
@@ -139,6 +133,10 @@ function emulateTyping(text, session, delayedStart, speedFactor = 1.0, randomnes
     let reviewCharThreshold = getRandomInt(MIN_CHARS_BEFORE_REVIEW, MAX_CHARS_BEFORE_REVIEW);
     let mistakeLog = [];
 
+    // Set sessionStartIndex at the start of each session
+    sessionStartIndex = getCaretPosition(activeElement);
+    console.log(`[DEBUG] New typing session. sessionStartIndex: ${sessionStartIndex}`);
+
     const startTyping = function () {
         function typeNextCharacter() {
             if (isPaused) {
@@ -158,8 +156,9 @@ function emulateTyping(text, session, delayedStart, speedFactor = 1.0, randomnes
                     let event = new KeyboardEvent("keydown", {key: wrongChar});
                     activeElement.dispatchEvent(event);
                     document.execCommand("insertText", false, wrongChar);
-                    // Log the mistake for possible delayed correction
+                    // Log the mistake for possible delayed correction (session-relative)
                     mistakeLog.push({pos: i, wrong: wrongChar, correct: text[i]});
+                    console.log(`[DEBUG] Mistake logged at session-relative pos ${i}: '${wrongChar}' should be '${text[i]}'`);
                     if (isImmediate) {
                         // Immediate fix: short pause, then fix
                         setTimeout(() => {
@@ -265,7 +264,8 @@ function emulateTyping(text, session, delayedStart, speedFactor = 1.0, randomnes
             ? [...Array(mistakeLog.length).keys()]
             : [...Array(mistakeLog.length).keys()].reverse();
         let fixIndex = 0;
-        function fixNext() {
+        // Use sessionStartIndex for session-relative mistake tracking
+        async function fixNext() {
             console.log(`[DEBUG] fixNext called with fixIndex: ${fixIndex}, indices.length: ${indices.length}`);
             if (fixIndex >= indices.length) {
                 clearTimeout(safetyTimeout);
@@ -278,32 +278,53 @@ function emulateTyping(text, session, delayedStart, speedFactor = 1.0, randomnes
             }
             const idx = indices[fixIndex];
             const {pos, correct} = mistakeLog[idx];
-            console.log(`[DEBUG] Fixing mistake at pos ${pos}: "${mistakeLog[idx].wrong}" -> "${correct}"`);
-            
-            // Move caret to position using arrow keys
+            let absolutePos = sessionStartIndex + pos;
+            const textLen = getTextLength(activeElement);
+            // Clamp absolutePos to valid range
+            if (absolutePos < 0) absolutePos = 0;
+            if (absolutePos > textLen) absolutePos = textLen;
+            // Validate position
+            if (absolutePos < 0 || absolutePos > textLen) {
+                console.warn(`[DEBUG] Skipping fix: calculated absolutePos ${absolutePos} is out of bounds (0,${textLen})`);
+                fixIndex++;
+                fixNext();
+                return;
+            }
+            console.log(`[DEBUG] Fixing mistake at session-relative pos ${pos} (absolute ${absolutePos}): "${mistakeLog[idx].wrong}" -> "${correct}"`);
+            // Move caret to position using arrow keys (awaited)
             const currentPos = getCaretPosition(activeElement);
-            console.log(`[DEBUG] Moving caret from ${currentPos} to ${pos + 1}`);
-            navigateWithArrowKeys(activeElement, pos + 1, currentPos, advancedSettings.allowSelection, advancedSettings.allowWordNavigation);
-            
+            console.log(`[DEBUG] Moving caret from ${currentPos} to ${absolutePos + 1}`);
+            await navigateWithArrowKeys(activeElement, absolutePos + 1, currentPos, advancedSettings.allowSelection, advancedSettings.allowWordNavigation);
             // Backspace
             console.log('[DEBUG] Performing backspace');
+            const beforeText = isTextInput(activeElement) ? activeElement.value : activeElement.innerText;
             stealthyBackspace(activeElement);
-            
-            setTimeout(() => {
-                // Type the correct character
-                console.log(`[DEBUG] Inserting correct character: "${correct}"`);
-                stealthyInsertText(activeElement, correct);
-                setTimeout(() => {
-                    fixIndex++;
-                    console.log(`[DEBUG] Moving to next fix, fixIndex: ${fixIndex}`);
-                    fixNext();
-                }, getRandomInt(MIN_BETWEEN_FIX_PAUSE_MS, MAX_BETWEEN_FIX_PAUSE_MS));
-            }, getRandomInt(MIN_BETWEEN_FIX_PAUSE_MS, MAX_BETWEEN_FIX_PAUSE_MS));
+            await new Promise(res => setTimeout(res, getRandomInt(MIN_BETWEEN_FIX_PAUSE_MS, MAX_BETWEEN_FIX_PAUSE_MS)));
+            // Type the correct character
+            console.log(`[DEBUG] Inserting correct character: "${correct}"`);
+            stealthyInsertText(activeElement, correct);
+            await new Promise(res => setTimeout(res, getRandomInt(MIN_BETWEEN_FIX_PAUSE_MS, MAX_BETWEEN_FIX_PAUSE_MS)));
+            const afterText = isTextInput(activeElement) ? activeElement.value : activeElement.innerText;
+            // Only update sessionStartIndex if text length changed
+            const newTextLength = getTextLength(activeElement);
+            const expectedLength = beforeText.length;
+            if (newTextLength !== expectedLength) {
+                const diff = newTextLength - expectedLength;
+                sessionStartIndex += diff;
+                mistakeLog.forEach(m => m.pos += diff);
+                console.log(`[DEBUG] Text length changed by ${diff}. Updated sessionStartIndex: ${sessionStartIndex}`);
+            }
+            fixIndex++;
+            console.log(`[DEBUG] Moving to next fix, fixIndex: ${fixIndex}`);
+            fixNext();
         }
         console.log('[DEBUG] Before starting fixNext.');
         fixNext();
     }
 }
+
+// Track session start index globally for session-relative mistake tracking
+let sessionStartIndex = 0;
 
 function getRandomWrongChar(correctChar) {
     // If character not in map, use fallback
