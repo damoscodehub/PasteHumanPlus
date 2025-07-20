@@ -263,7 +263,7 @@ async function reviewAndFixMistakes(state) {
         console.log(`[DEBUG] Fixing mistake at session-relative pos ${pos} (absolute ${absolutePos}): "${state.mistakeLog[idx].wrong}" -> "${correct}"`);
         const currentPos = getCaretPosition(state.activeElement);
         console.log(`[DEBUG] Moving caret from ${currentPos} to ${absolutePos + 1}`);
-        await navigateWithArrowKeys(state.activeElement, absolutePos + 1, currentPos, advancedSettings.allowSelection, advancedSettings.allowWordNavigation);
+        await hybridNavigateToPosition(state.activeElement, absolutePos + 1, currentPos, advancedSettings.allowSelection, advancedSettings.allowWordNavigation);
         console.log('[DEBUG] Performing backspace');
         const beforeText = isTextInput(state.activeElement) ? state.activeElement.value : state.activeElement.innerText;
         stealthyBackspace(state.activeElement);
@@ -298,12 +298,26 @@ async function reviewAndFixMistakes(state) {
 async function navigateWithArrowKeys(el, targetPos, currentPos, allowSelection = false, allowWordNavigation = false) {
     const steps = Math.abs(targetPos - currentPos);
     if (steps === 0) return;
-    const direction = currentPos < targetPos ? 'right' : 'left';
-    const key = direction === 'right' ? 'ArrowRight' : 'ArrowLeft';
-    const keyCode = direction === 'right' ? 39 : 37;
-    const stepDelay = getRandomInt(30, 80); // ms between arrow presses
     let pos = currentPos;
     for (let i = 0; i < steps; i++) {
+        let nextPos;
+        if (allowWordNavigation) {
+            // Move by word
+            const text = isTextInput(el) ? el.value : el.innerText;
+            if (targetPos > pos) {
+                nextPos = findNextWordBoundary(text, pos);
+                if (nextPos > targetPos) nextPos = targetPos;
+            } else {
+                nextPos = findPrevWordBoundary(text, pos);
+                if (nextPos < targetPos) nextPos = targetPos;
+            }
+        } else {
+            // Move by character
+            nextPos = pos + (targetPos > pos ? 1 : -1);
+        }
+        const direction = nextPos > pos ? 'right' : 'left';
+        const key = direction === 'right' ? 'ArrowRight' : 'ArrowLeft';
+        const keyCode = direction === 'right' ? 39 : 37;
         const eventOptions = {
             key: key,
             code: key,
@@ -316,11 +330,37 @@ async function navigateWithArrowKeys(el, targetPos, currentPos, allowSelection =
         if (allowWordNavigation) eventOptions.ctrlKey = true;
         const event = new KeyboardEvent('keydown', eventOptions);
         el.dispatchEvent(event);
-        // Move caret one step
-        pos += (direction === 'right' ? 1 : -1);
+        pos = nextPos;
         setCaretPosition(el, pos);
         console.log(`[DEBUG] Arrow navigation step ${i+1}/${steps}: pos=${pos}`);
-        await new Promise(res => setTimeout(res, stepDelay));
+        await new Promise(res => setTimeout(res, getRandomInt(30, 80)));
+        if (pos === targetPos) break;
+    }
+}
+
+// Hybrid navigation: use word navigation for big jumps, then character navigation for fine-tuning
+async function hybridNavigateToPosition(el, targetPos, currentPos, allowSelection = false, allowWordNavigation = false) {
+    let pos = currentPos;
+    // Use word navigation for big jumps
+    if (allowWordNavigation && Math.abs(targetPos - pos) > 5) {
+        while (Math.abs(targetPos - pos) > 5) {
+            let nextPos;
+            const text = isTextInput(el) ? el.value : el.innerText;
+            if (targetPos > pos) {
+                nextPos = findNextWordBoundary(text, pos);
+                if (nextPos > targetPos) nextPos = targetPos;
+            } else {
+                nextPos = findPrevWordBoundary(text, pos);
+                if (nextPos < targetPos) nextPos = targetPos;
+            }
+            if (nextPos === pos) break; // can't move further by word
+            await navigateWithArrowKeys(el, nextPos, pos, allowSelection, true);
+            pos = nextPos;
+        }
+    }
+    // Fine-tune with character navigation
+    if (pos !== targetPos) {
+        await navigateWithArrowKeys(el, targetPos, pos, allowSelection, false);
     }
 }
 
@@ -423,6 +463,29 @@ function stealthyBackspace(el) {
     document.execCommand("delete", false, null);
     let inputEvent = new Event('input', {bubbles: true});
     el.dispatchEvent(inputEvent);
+}
+
+// --- Utility for word navigation ---
+function findNextWordBoundary(text, pos) {
+    // Move right to the end of the current word, then to the start of the next word
+    const len = text.length;
+    let i = pos;
+    // Skip non-word chars
+    while (i < len && !/\w/.test(text[i])) i++;
+    // Skip word chars
+    while (i < len && /\w/.test(text[i])) i++;
+    // Skip non-word chars to the start of the next word
+    while (i < len && !/\w/.test(text[i])) i++;
+    return i;
+}
+function findPrevWordBoundary(text, pos) {
+    // Move left to the start of the current word, then to the end of the previous word
+    let i = pos;
+    // Skip non-word chars
+    while (i > 0 && !/\w/.test(text[i-1])) i--;
+    // Skip word chars
+    while (i > 0 && /\w/.test(text[i-1])) i--;
+    return i;
 }
 
 // --- Utility ---
