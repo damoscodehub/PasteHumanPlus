@@ -1,5 +1,4 @@
 // === Configurable Parameters ===
-const IMMEDIATE_FIX_PERCENTAGE = 75; // % of mistakes fixed immediately
 const MIN_CHARS_BEFORE_REVIEW = 5;
 const MAX_CHARS_BEFORE_REVIEW = 15;
 const MIN_REVIEW_PAUSE_MS = 300;
@@ -16,13 +15,23 @@ let currentRandomnessFactor = 1.0;
 let currentMistakeProbability = 0.03; // Default: 3%
 
 // Advanced settings with defaults
-let advancedSettings = {
+const ADVANCED_DEFAULTS = {
     allowSelection: true,
-    allowWordNavigation: true
+    allowWordNavigation: true,
+    immediateFixPercentage: 75,
+    minCharsBeforeReview: 5,
+    maxCharsBeforeReview: 15,
+    minReviewPause: 1000,
+    maxReviewPause: 3000,
+    minImmediateFixPause: 100,
+    maxImmediateFixPause: 400,
+    minBetweenFixPause: 100,
+    maxBetweenFixPause: 300
 };
+let advancedSettings = {...ADVANCED_DEFAULTS};
 
 // Load settings from chrome.storage.local when script initializes
-chrome.storage.local.get(['speedFactor', 'randomnessFactor', 'mistakeProbability', 'allowSelection', 'allowWordNavigation'], function(result) {
+chrome.storage.local.get(['speedFactor', 'randomnessFactor', 'mistakeProbability', 'allowSelection', 'allowWordNavigation', 'immediateFixPercentage', 'minCharsBeforeReview', 'maxCharsBeforeReview', 'minReviewPause', 'maxReviewPause', 'minImmediateFixPause', 'maxImmediateFixPause', 'minBetweenFixPause', 'maxBetweenFixPause', 'advancedSettings'], function(result) {
     if (result.speedFactor !== undefined) {
         currentSpeedFactor = result.speedFactor;
     }
@@ -32,11 +41,14 @@ chrome.storage.local.get(['speedFactor', 'randomnessFactor', 'mistakeProbability
     if (result.mistakeProbability !== undefined) {
         currentMistakeProbability = result.mistakeProbability;
     }
-    if (result.allowSelection !== undefined) {
-        advancedSettings.allowSelection = result.allowSelection;
-    }
-    if (result.allowWordNavigation !== undefined) {
-        advancedSettings.allowWordNavigation = result.allowWordNavigation;
+    // Merge advancedSettings from storage with defaults
+    if (result.advancedSettings) {
+        advancedSettings = {...ADVANCED_DEFAULTS, ...result.advancedSettings};
+    } else {
+        // For backward compatibility, check for individual keys
+        Object.keys(ADVANCED_DEFAULTS).forEach(key => {
+            if (result[key] !== undefined) advancedSettings[key] = result[key];
+        });
     }
 });
 
@@ -48,8 +60,8 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
     } else if (request.action === "updateMistakeProbability") {
         currentMistakeProbability = request.mistakeProbability;
     } else if (request.action === "updateAdvancedSettings") {
-        // Update advanced settings when they change
-        Object.assign(advancedSettings, request.settings);
+        // Merge with defaults to avoid missing properties
+        advancedSettings = {...ADVANCED_DEFAULTS, ...request.settings};
     } else if (request.action === "emulateTyping") {
         // Cancel any existing session
         typingState = null;
@@ -88,12 +100,17 @@ function waitIfPaused() {
 
 function startTypingSession(text, speedFactor, randomnessFactor, mistakeProbability, delayedStart) {
     const activeElement = document.activeElement;
+    console.log('[DEBUG] Typing session settings:', JSON.stringify(advancedSettings));
+    const minChars = advancedSettings.minCharsBeforeReview ?? ADVANCED_DEFAULTS.minCharsBeforeReview;
+    const maxChars = advancedSettings.maxCharsBeforeReview ?? ADVANCED_DEFAULTS.maxCharsBeforeReview;
     typingState = {
         text,
         i: 0,
         baseDelay: 100 / speedFactor,
         charsSinceLastReview: 0,
-        reviewCharThreshold: getRandomInt(MIN_CHARS_BEFORE_REVIEW, MAX_CHARS_BEFORE_REVIEW),
+        reviewCharThreshold: (minChars === maxChars)
+            ? minChars
+            : getRandomInt(minChars, maxChars),
         mistakeLog: [],
         sessionStartIndex: getCaretPosition(activeElement),
         speedFactor,
@@ -121,7 +138,8 @@ async function mainTypingLoop() {
         const randomValue = Math.random();
         const shouldMakeMistake = randomValue < state.mistakeProbability && state.text[state.i].match(/[a-zA-Z0-9]/);
         if (shouldMakeMistake) {
-            const isImmediate = Math.random() < (IMMEDIATE_FIX_PERCENTAGE / 100);
+            console.log(`[DEBUG] immediateFixPercentage at mistake: ${advancedSettings.immediateFixPercentage}`);
+            const isImmediate = Math.random() < (advancedSettings.immediateFixPercentage / 100);
             const wrongChar = getRandomWrongChar(state.text[state.i]);
             let event = new KeyboardEvent("keydown", {key: wrongChar});
             state.activeElement.dispatchEvent(event);
@@ -129,6 +147,7 @@ async function mainTypingLoop() {
             state.mistakeLog.push({pos: state.i, wrong: wrongChar, correct: state.text[state.i]});
             console.log(`[DEBUG] Mistake logged at session-relative pos ${state.i}: '${wrongChar}' should be '${state.text[state.i]}'`);
             if (isImmediate) {
+                console.log(`[DEBUG] Immediately fixing mistake at session-relative pos ${state.i}: "${wrongChar}" -> "${state.text[state.i]}"`);
                 await new Promise(res => setTimeout(res, getRandomInt(MIN_IMMEDIATE_FIX_PAUSE_MS, MAX_IMMEDIATE_FIX_PAUSE_MS)));
                 await waitIfPaused();
                 if (!state.running) return;
@@ -164,13 +183,18 @@ async function mainTypingLoop() {
         document.execCommand("insertText", false, state.text[state.i++]);
         state.charsSinceLastReview++;
         // Check if it's time for a review phase
+        const minChars = advancedSettings.minCharsBeforeReview ?? ADVANCED_DEFAULTS.minCharsBeforeReview;
+        const maxChars = advancedSettings.maxCharsBeforeReview ?? ADVANCED_DEFAULTS.maxCharsBeforeReview;
+        console.log(`[DEBUG] charsSinceLastReview: ${state.charsSinceLastReview}, reviewCharThreshold: ${state.reviewCharThreshold}, mistakeLog.length: ${state.mistakeLog.length}`);
         if (state.charsSinceLastReview >= state.reviewCharThreshold && state.mistakeLog.length > 0) {
             await new Promise(res => setTimeout(res, getRandomInt(MIN_REVIEW_PAUSE_MS, MAX_REVIEW_PAUSE_MS)));
             await waitIfPaused();
             if (!state.running) return;
             await reviewAndFixMistakes(state);
             state.charsSinceLastReview = 0;
-            state.reviewCharThreshold = getRandomInt(MIN_CHARS_BEFORE_REVIEW, MAX_CHARS_BEFORE_REVIEW);
+            state.reviewCharThreshold = (minChars === maxChars)
+                ? minChars
+                : getRandomInt(minChars, maxChars);
             await new Promise(res => setTimeout(res, state.baseDelay));
         } else {
             let delay;
@@ -193,8 +217,16 @@ async function mainTypingLoop() {
     // Typing completed
     if (state.mistakeLog.length > 0) {
         console.log('[DEBUG] Final review phase triggered. mistakeLog:', JSON.stringify(state.mistakeLog));
+        console.log(`[DEBUG] Final review: ${state.mistakeLog.length} mistakes to fix`);
         await reviewAndFixMistakes(state);
-        console.log('[DEBUG] Final review phase complete. activeElement.value:', state.activeElement.value);
+        console.log('[DEBUG] Final review phase complete. activeElement text:', isTextInput(state.activeElement) ? state.activeElement.value : state.activeElement.innerText);
+        
+        // Double-check: if there are still mistakes, try one more time
+        if (state.mistakeLog.length > 0) {
+            console.log('[DEBUG] Some mistakes still remain, trying final cleanup');
+            await reviewAndFixMistakes(state);
+            console.log('[DEBUG] Final cleanup complete. Remaining mistakes:', state.mistakeLog.length);
+        }
     }
     typingState = null;
 }
@@ -245,7 +277,13 @@ async function reviewAndFixMistakes(state) {
         if (newTextLength !== expectedLength) {
             const diff = newTextLength - expectedLength;
             state.sessionStartIndex += diff;
-            state.mistakeLog.forEach(m => m.pos += diff);
+            // Update all remaining mistake positions
+            for (let j = fixIndex + 1; j < indices.length; j++) {
+                const remainingIdx = indices[j];
+                if (state.mistakeLog[remainingIdx]) {
+                    state.mistakeLog[remainingIdx].pos += diff;
+                }
+            }
             console.log(`[DEBUG] Text length changed by ${diff}. Updated sessionStartIndex: ${state.sessionStartIndex}`);
         }
     }

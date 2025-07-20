@@ -573,6 +573,24 @@ elements.mistakeInput.addEventListener('change', handleMistakeInputChange);
   // Advanced options modal buttons
   if (elements.cancelAdvancedOptionsBtn) {
     elements.cancelAdvancedOptionsBtn.addEventListener('click', function() {
+      // Revert advancedSettings and UI fields to snapshot
+      if (advancedOptionsSnapshot) {
+        Object.assign(advancedSettings, advancedOptionsSnapshot);
+        // Update all UI fields to match snapshot
+        if (elements.immediateFixPercentageInput) elements.immediateFixPercentageInput.value = advancedOptionsSnapshot.immediateFixPercentage;
+        if (elements.minCharsBeforeReviewInput) elements.minCharsBeforeReviewInput.value = advancedOptionsSnapshot.minCharsBeforeReview;
+        if (elements.maxCharsBeforeReviewInput) elements.maxCharsBeforeReviewInput.value = advancedOptionsSnapshot.maxCharsBeforeReview;
+        if (elements.minReviewPauseInput) elements.minReviewPauseInput.value = advancedOptionsSnapshot.minReviewPause;
+        if (elements.maxReviewPauseInput) elements.maxReviewPauseInput.value = advancedOptionsSnapshot.maxReviewPause;
+        if (elements.minImmediateFixPauseInput) elements.minImmediateFixPauseInput.value = advancedOptionsSnapshot.minImmediateFixPause;
+        if (elements.maxImmediateFixPauseInput) elements.maxImmediateFixPauseInput.value = advancedOptionsSnapshot.maxImmediateFixPause;
+        if (elements.minBetweenFixPauseInput) elements.minBetweenFixPauseInput.value = advancedOptionsSnapshot.minBetweenFixPause;
+        if (elements.maxBetweenFixPauseInput) elements.maxBetweenFixPauseInput.value = advancedOptionsSnapshot.maxBetweenFixPause;
+        if (elements.allowSelectionInput) elements.allowSelectionInput.checked = advancedOptionsSnapshot.allowSelection;
+        if (elements.allowWordNavigationInput) elements.allowWordNavigationInput.checked = advancedOptionsSnapshot.allowWordNavigation;
+        updateRestoreButtons();
+        updateApplyAdvancedOptionsBtnState();
+      }
       hideModal(elements.advancedOptionsModal);
     });
 }
