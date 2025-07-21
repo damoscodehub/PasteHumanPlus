@@ -397,7 +397,8 @@ min-height: 16px;
   z-index: 10;
   box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
-.input-invalid + .input-error-tooltip {
+.input-invalid:focus + .input-error-tooltip,
+.input-invalid:hover + .input-error-tooltip {
   display: block;
 }
 .input-invalid {

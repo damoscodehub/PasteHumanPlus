@@ -1,12 +1,5 @@
 // === Configurable Parameters ===
-const MIN_CHARS_BEFORE_REVIEW = 5;
-const MAX_CHARS_BEFORE_REVIEW = 15;
-const MIN_REVIEW_PAUSE_MS = 300;
-const MAX_REVIEW_PAUSE_MS = 1200;
-const MIN_IMMEDIATE_FIX_PAUSE_MS = 100;
-const MAX_IMMEDIATE_FIX_PAUSE_MS = 400;
-const MIN_BETWEEN_FIX_PAUSE_MS = 100;
-const MAX_BETWEEN_FIX_PAUSE_MS = 300;
+// Removed hardcoded constants - now using ADVANCED_DEFAULTS from centralized configuration
 
 let typingState = null;
 let isPaused = false;
@@ -14,42 +7,25 @@ let currentSpeedFactor = 1.0;
 let currentRandomnessFactor = 1.0;
 let currentMistakeProbability = 0.03; // Default: 3%
 
-// Advanced settings with defaults
-const ADVANCED_DEFAULTS = {
-    allowWordNavigation: true,
-    immediateFixPercentage: 75,
-    minCharsBeforeReview: 5,
-    maxCharsBeforeReview: 15,
-    minReviewPause: 1000,
-    maxReviewPause: 3000,
-    minImmediateFixPause: 100,
-    maxImmediateFixPause: 400,
-    minBetweenFixPause: 100,
-    maxBetweenFixPause: 300
-};
-let advancedSettings = {...ADVANCED_DEFAULTS};
+// Advanced settings with defaults - synchronized with popup.js PARAM_CONFIG
+// Remove ADVANCED_DEFAULTS for advanced settings
+// Always load all settings from chrome.storage.local
+let PARAM_CONFIG = {};
+let advancedSettings = {};
 
-// Load settings from chrome.storage.local when script initializes
-chrome.storage.local.get(['speedFactor', 'randomnessFactor', 'mistakeProbability', 'allowWordNavigation', 'immediateFixPercentage', 'minCharsBeforeReview', 'maxCharsBeforeReview', 'minReviewPause', 'maxReviewPause', 'minImmediateFixPause', 'maxImmediateFixPause', 'minBetweenFixPause', 'maxBetweenFixPause', 'advancedSettings'], function(result) {
-    if (result.speedFactor !== undefined) {
-        currentSpeedFactor = result.speedFactor;
-    }
-    if (result.randomnessFactor !== undefined) {
-        currentRandomnessFactor = result.randomnessFactor;
-    }
-    if (result.mistakeProbability !== undefined) {
-        currentMistakeProbability = result.mistakeProbability;
-    }
-    // Merge advancedSettings from storage with defaults
-    if (result.advancedSettings) {
-        advancedSettings = {...ADVANCED_DEFAULTS, ...result.advancedSettings};
-    } else {
-        // For backward compatibility, check for individual keys
-        Object.keys(ADVANCED_DEFAULTS).forEach(key => {
-            if (result[key] !== undefined) advancedSettings[key] = result[key];
-        });
-    }
-});
+function loadSettingsFromStorage(callback) {
+  chrome.storage.local.get(['PARAM_CONFIG'], (result) => {
+    PARAM_CONFIG = result.PARAM_CONFIG || {};
+    // Now load current values
+    chrome.storage.local.get(Object.keys(PARAM_CONFIG), (current) => {
+      advancedSettings = { ...Object.fromEntries(Object.entries(PARAM_CONFIG).map(([k, v]) => [k, v.default])), ...current };
+      if (callback) callback();
+    });
+  });
+}
+
+// Call this at script start
+loadSettingsFromStorage();
 
 chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
     if (request.action === "updateSpeedFactor") {
@@ -60,7 +36,7 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
         currentMistakeProbability = request.mistakeProbability;
     } else if (request.action === "updateAdvancedSettings") {
         // Merge with defaults to avoid missing properties
-        advancedSettings = {...ADVANCED_DEFAULTS, ...request.settings};
+        advancedSettings = {...PARAM_CONFIG, ...request.settings};
     } else if (request.action === "emulateTyping") {
         // Cancel any existing session
         typingState = null;
@@ -100,8 +76,8 @@ function waitIfPaused() {
 function startTypingSession(text, speedFactor, randomnessFactor, mistakeProbability, delayedStart) {
     const activeElement = document.activeElement;
     console.log('[DEBUG] Typing session settings:', JSON.stringify(advancedSettings));
-    const minChars = advancedSettings.minCharsBeforeReview ?? ADVANCED_DEFAULTS.minCharsBeforeReview;
-    const maxChars = advancedSettings.maxCharsBeforeReview ?? ADVANCED_DEFAULTS.maxCharsBeforeReview;
+    const minChars = advancedSettings.minCharsBeforeReview ?? PARAM_CONFIG.minCharsBeforeReview?.default ?? 5;
+    const maxChars = advancedSettings.maxCharsBeforeReview ?? PARAM_CONFIG.maxCharsBeforeReview?.default ?? 15;
     typingState = {
         text,
         i: 0,
@@ -147,14 +123,16 @@ async function mainTypingLoop() {
             console.log(`[DEBUG] Mistake logged at session-relative pos ${state.i}: '${wrongChar}' should be '${state.text[state.i]}'`);
             if (isImmediate) {
                 console.log(`[DEBUG] Immediately fixing mistake at session-relative pos ${state.i}: "${wrongChar}" -> "${state.text[state.i]}"`);
-                await new Promise(res => setTimeout(res, getRandomInt(MIN_IMMEDIATE_FIX_PAUSE_MS, MAX_IMMEDIATE_FIX_PAUSE_MS)));
+                const minImmediatePause = advancedSettings.minImmediateFixPause ?? PARAM_CONFIG.minImmediateFixPause?.default ?? 500;
+                const maxImmediatePause = advancedSettings.maxImmediateFixPause ?? PARAM_CONFIG.maxImmediateFixPause?.default ?? 3000;
+                await new Promise(res => setTimeout(res, getRandomInt(minImmediatePause, maxImmediatePause)));
                 await waitIfPaused();
                 if (!state.running) return;
                 // Backspace
                 let backspaceEvent = new KeyboardEvent("keydown", {key: "Backspace"});
                 state.activeElement.dispatchEvent(backspaceEvent);
                 document.execCommand("delete", false, null);
-                await new Promise(res => setTimeout(res, getRandomInt(MIN_IMMEDIATE_FIX_PAUSE_MS, MAX_IMMEDIATE_FIX_PAUSE_MS)));
+                await new Promise(res => setTimeout(res, getRandomInt(minImmediatePause, maxImmediatePause)));
                 await waitIfPaused();
                 if (!state.running) return;
                 // Type the correct character
@@ -182,11 +160,13 @@ async function mainTypingLoop() {
         document.execCommand("insertText", false, state.text[state.i++]);
         state.charsSinceLastReview++;
         // Check if it's time for a review phase
-        const minChars = advancedSettings.minCharsBeforeReview ?? ADVANCED_DEFAULTS.minCharsBeforeReview;
-        const maxChars = advancedSettings.maxCharsBeforeReview ?? ADVANCED_DEFAULTS.maxCharsBeforeReview;
+        const minChars = advancedSettings.minCharsBeforeReview ?? PARAM_CONFIG.minCharsBeforeReview?.default ?? 5;
+        const maxChars = advancedSettings.maxCharsBeforeReview ?? PARAM_CONFIG.maxCharsBeforeReview?.default ?? 15;
         console.log(`[DEBUG] charsSinceLastReview: ${state.charsSinceLastReview}, reviewCharThreshold: ${state.reviewCharThreshold}, mistakeLog.length: ${state.mistakeLog.length}`);
         if (state.charsSinceLastReview >= state.reviewCharThreshold && state.mistakeLog.length > 0) {
-            await new Promise(res => setTimeout(res, getRandomInt(MIN_REVIEW_PAUSE_MS, MAX_REVIEW_PAUSE_MS)));
+            const minReviewPause = advancedSettings.minReviewPause ?? PARAM_CONFIG.minReviewPause?.default ?? 2000;
+            const maxReviewPause = advancedSettings.maxReviewPause ?? PARAM_CONFIG.maxReviewPause?.default ?? 5000;
+            await new Promise(res => setTimeout(res, getRandomInt(minReviewPause, maxReviewPause)));
             await waitIfPaused();
             if (!state.running) return;
             await reviewAndFixMistakes(state);
@@ -266,10 +246,12 @@ async function reviewAndFixMistakes(state) {
         console.log('[DEBUG] Performing backspace');
         const beforeText = isTextInput(state.activeElement) ? state.activeElement.value : state.activeElement.innerText;
         stealthyBackspace(state.activeElement);
-        await new Promise(res => setTimeout(res, getRandomInt(MIN_BETWEEN_FIX_PAUSE_MS, MAX_BETWEEN_FIX_PAUSE_MS)));
+        const minBetweenPause = advancedSettings.minBetweenFixPause ?? PARAM_CONFIG.minBetweenFixPause?.default ?? 1000;
+        const maxBetweenPause = advancedSettings.maxBetweenFixPause ?? PARAM_CONFIG.maxBetweenFixPause?.default ?? 3000;
+        await new Promise(res => setTimeout(res, getRandomInt(minBetweenPause, maxBetweenPause)));
         console.log(`[DEBUG] Inserting correct character: "${correct}"`);
         stealthyInsertText(state.activeElement, correct);
-        await new Promise(res => setTimeout(res, getRandomInt(MIN_BETWEEN_FIX_PAUSE_MS, MAX_BETWEEN_FIX_PAUSE_MS)));
+        await new Promise(res => setTimeout(res, getRandomInt(minBetweenPause, maxBetweenPause)));
         const afterText = isTextInput(state.activeElement) ? state.activeElement.value : state.activeElement.innerText;
         const newTextLength = getTextLength(state.activeElement);
         const expectedLength = beforeText.length;

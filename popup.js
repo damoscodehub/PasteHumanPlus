@@ -9,22 +9,26 @@ let menuStrings = {
   stop: "."
 };
 
-// Centralized configuration for all parameters
-const PARAM_CONFIG = {
-  speedFactor: { default: 1.0, min: 10, max: 200 },
-  randomnessFactor: { default: 1.0, min: 10, max: 200 },
-  mistakeProbability: { default: 0.03, min: 0, max: 20 },
-  immediateFixPercentage: { default: 75, min: 0, max: 100 },
-  minCharsBeforeReview: { default: 5, min: 1, max: 50 },
-  maxCharsBeforeReview: { default: 15, min: 1, max: 50 },
-  minReviewPause: { default: 2000, min: 10, max: 10000 },
-  maxReviewPause: { default: 5000, min: 10, max: 10000 },
-  minImmediateFixPause: { default: 500, min: 10, max: 10000 },
-  maxImmediateFixPause: { default: 3000, min: 10, max: 10000 },
-  minBetweenFixPause: { default: 1000, min: 10, max: 10000 },
-  maxBetweenFixPause: { default: 3000, min: 10, max: 10000 },
-  allowWordNavigation: { default: true }
-};
+// Remove hardcoded PARAM_CONFIG and DEFAULT_VALUES. Load from storage.
+let PARAM_CONFIG = {};
+let currentValues = {};
+
+// List of all parameter keys (from PARAM_CONFIG)
+let PARAM_KEYS = [];
+
+function loadConfigAndValues(callback) {
+  chrome.storage.local.get(['PARAM_CONFIG'], (result) => {
+    PARAM_CONFIG = result.PARAM_CONFIG || {};
+    PARAM_KEYS = Object.keys(PARAM_CONFIG);
+    chrome.storage.local.get(PARAM_KEYS, (vals) => {
+      currentValues = { ...Object.fromEntries(Object.entries(PARAM_CONFIG).map(([k, v]) => [k, v.default])), ...vals };
+      if (callback) callback();
+    });
+  });
+}
+
+// Call this at script start
+loadConfigAndValues();
 
 // Extract default values for backward compatibility
 const DEFAULT_VALUES = Object.fromEntries(
@@ -127,34 +131,105 @@ function checkForNonDefaultValues() {
   return false;
 }
 
-function restoreAllDefaults() {
-  // Restore all advanced settings to default values using centralized DEFAULT_VALUES
-  advancedSettings = {
-    allowWordNavigation: DEFAULT_VALUES.allowWordNavigation,
-    immediateFixPercentage: DEFAULT_VALUES.immediateFixPercentage,
-    minCharsBeforeReview: DEFAULT_VALUES.minCharsBeforeReview,
-    maxCharsBeforeReview: DEFAULT_VALUES.maxCharsBeforeReview,
-    minReviewPause: DEFAULT_VALUES.minReviewPause,
-    maxReviewPause: DEFAULT_VALUES.maxReviewPause,
-    minImmediateFixPause: DEFAULT_VALUES.minImmediateFixPause,
-    maxImmediateFixPause: DEFAULT_VALUES.maxImmediateFixPause,
-    minBetweenFixPause: DEFAULT_VALUES.minBetweenFixPause,
-    maxBetweenFixPause: DEFAULT_VALUES.maxBetweenFixPause
-  };
-  
-  // Restore main settings (these are stored separately)
-  speedFactor = DEFAULT_VALUES.speedFactor;
-  randomnessFactor = DEFAULT_VALUES.randomnessFactor;
-  mistakeProbability = DEFAULT_VALUES.mistakeProbability;
-  
-  // Update all UI elements to reflect the default values
+// Map input IDs to storage keys for both main popup and advanced modal
+const INPUT_ID_TO_KEY = {
+  speedInput: 'speedFactor',
+  advancedSpeedInput: 'speedFactor',
+  randomnessInput: 'randomnessFactor',
+  advancedRandomnessInput: 'randomnessFactor',
+  mistakeInput: 'mistakeProbability',
+  advancedMistakeInput: 'mistakeProbability',
+  immediateFixPercentageInput: 'immediateFixPercentage',
+  minCharsBeforeReviewInput: 'minCharsBeforeReview',
+  maxCharsBeforeReviewInput: 'maxCharsBeforeReview',
+  minReviewPauseInput: 'minReviewPause',
+  maxReviewPauseInput: 'maxReviewPause',
+  minImmediateFixPauseInput: 'minImmediateFixPause',
+  maxImmediateFixPauseInput: 'maxImmediateFixPause',
+  minBetweenFixPauseInput: 'minBetweenFixPause',
+  maxBetweenFixPauseInput: 'maxBetweenFixPause',
+  allowWordNavigationInput: 'allowWordNavigation'
+};
+
+// Generate restore buttons for all fields in both main popup and advanced modal
+function updateRestoreButtons() {
+  Object.entries(INPUT_ID_TO_KEY).forEach(([inputId, key]) => {
+    const input = document.getElementById(inputId);
+    let btn = document.getElementById('restoreBtn_' + inputId);
+    if (!input) return;
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.className = 'restore-default-btn';
+      btn.id = 'restoreBtn_' + inputId;
+      btn.innerHTML = '&#8634;';
+      btn.title = 'Restore default';
+      btn.onclick = () => restoreDefaultValue(key);
+      input.parentElement.appendChild(btn);
+    }
+    // Show/hide button
+    if (currentValues[key] !== PARAM_CONFIG[key]?.default) {
+      btn.style.display = 'inline-block';
+    } else {
+      btn.style.display = 'none';
+    }
+  });
+}
+
+// Attach restore buttons and validation to all number inputs in both main popup and advanced modal
+function attachRestoreAndValidationHandlers() {
+  Object.entries(INPUT_ID_TO_KEY).forEach(([inputId, key]) => {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    // Attach validation on input, focus, and mouseenter
+    const validate = () => validateAndUpdateSetting(input, key);
+    input.addEventListener('input', validate);
+    input.addEventListener('focus', validate);
+    input.addEventListener('mouseenter', validate);
+    // Attach restore button (if not already present)
+    let btn = document.getElementById('restoreBtn_' + inputId);
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.className = 'restore-default-btn';
+      btn.id = 'restoreBtn_' + inputId;
+      btn.innerHTML = '&#8634;';
+      btn.title = 'Restore default';
+      btn.onclick = () => restoreDefaultValue(key);
+      input.parentElement.appendChild(btn);
+    }
+  });
+}
+
+// Update both main popup and advanced modal fields from storage
+function updateAllDisplays() {
   updateAdvancedDisplay();
-  updateSpeedDisplay();
-  updateRandomnessDisplay();
-  updateMistakeDisplay();
-  
-  // Update the button states
-  updateApplyAdvancedOptionsBtnState();
+  updateMainPopupDisplay();
+  attachRestoreAndValidationHandlers();
+}
+
+// After restore, update both sets of fields
+function restoreAllDefaults() {
+  chrome.storage.local.get(['PARAM_CONFIG'], (result) => {
+    const config = result.PARAM_CONFIG || {};
+    const defaults = Object.fromEntries(
+      Object.entries(config).map(([key, val]) => [key, val.default])
+    );
+    chrome.storage.local.set(defaults, () => {
+      loadConfigAndValues(updateAllDisplays);
+    });
+  });
+}
+
+function restoreDefaultValue(settingKey) {
+  chrome.storage.local.get(['PARAM_CONFIG'], (result) => {
+    const config = result.PARAM_CONFIG || {};
+    if (config[settingKey]) {
+      const obj = {};
+      obj[settingKey] = config[settingKey].default;
+      chrome.storage.local.set(obj, () => {
+        loadConfigAndValues(updateAllDisplays);
+      });
+    }
+  });
 }
 
 // === DYNAMIC ADVANCED TOOLTIP ENHANCEMENT ===
@@ -291,17 +366,22 @@ function validateAndUpdateSetting(inputElement, settingKey) {
         valid = false;
         errorMsg = `Value must be at most ${config.max}.`;
       }
+      // Fix: allow value == max
+      else if (typeof config.max === 'number' && value === config.max) {
+        valid = true;
+        errorMsg = '';
+      }
     }
     if (!valid) {
       setInputError(inputElement, errorMsg);
     } else {
       clearInputError(inputElement);
-      advancedSettings[settingKey] = value;
+      currentValues[settingKey] = value;
     }
   } else {
     // For checkboxes, always valid
     clearInputError(inputElement);
-    advancedSettings[settingKey] = inputElement.checked;
+    currentValues[settingKey] = inputElement.checked;
   }
   updateRestoreButton(settingKey, inputElement);
   updateApplyAdvancedOptionsBtnState();
@@ -509,55 +589,36 @@ function sendAdvancedSettingsToContent() {
   });
 }
 
+// Update advanced modal fields
 function updateAdvancedDisplay() {
-  // Update advanced speed controls
-  if (elements.advancedSpeedInput) {
-    elements.advancedSpeedInput.value = Math.round(speedFactor * 100);
+  PARAM_KEYS.forEach(key => {
+    const input = document.getElementById((key === 'allowWordNavigation' ? 'allowWordNavigationInput' : key + 'Input'));
+    if (input) {
+      if (input.type === 'checkbox') {
+        input.checked = !!currentValues[key];
+      } else {
+        input.value = currentValues[key];
+      }
+    }
+  });
+  updateRestoreButtons();
+  updateApplyAdvancedOptionsBtnState();
 }
-  
-  // Update advanced randomness controls
-  if (elements.advancedRandomnessInput) {
-    elements.advancedRandomnessInput.value = Math.round(randomnessFactor * 100);
-}
-  
-  // Update advanced mistake controls
-  if (elements.advancedMistakeInput) {
-    elements.advancedMistakeInput.value = Math.round(mistakeProbability * 100);
-}
-  
-  // Update editable values
-  if (elements.immediateFixPercentageInput) {
-    elements.immediateFixPercentageInput.value = advancedSettings.immediateFixPercentage;
-}
-  if (elements.minCharsBeforeReviewInput) {
-    elements.minCharsBeforeReviewInput.value = advancedSettings.minCharsBeforeReview;
-}
-  if (elements.maxCharsBeforeReviewInput) {
-    elements.maxCharsBeforeReviewInput.value = advancedSettings.maxCharsBeforeReview;
-}
-  if (elements.minReviewPauseInput) {
-    elements.minReviewPauseInput.value = advancedSettings.minReviewPause;
-}
-  if (elements.maxReviewPauseInput) {
-    elements.maxReviewPauseInput.value = advancedSettings.maxReviewPause;
-}
-  if (elements.minImmediateFixPauseInput) {
-    elements.minImmediateFixPauseInput.value = advancedSettings.minImmediateFixPause;
-}
-  if (elements.maxImmediateFixPauseInput) {
-    elements.maxImmediateFixPauseInput.value = advancedSettings.maxImmediateFixPause;
-}
-  if (elements.minBetweenFixPauseInput) {
-    elements.minBetweenFixPauseInput.value = advancedSettings.minBetweenFixPause;
-}
-  if (elements.maxBetweenFixPauseInput) {
-    elements.maxBetweenFixPauseInput.value = advancedSettings.maxBetweenFixPause;
-}
-  if (elements.allowWordNavigationInput) {
-    elements.allowWordNavigationInput.checked = advancedSettings.allowWordNavigation;
-}
-  
-  // Update restore buttons after updating all values
+
+// Update main popup fields
+function updateMainPopupDisplay() {
+  const speedInput = document.getElementById('speedInput');
+  if (speedInput) speedInput.value = currentValues.speedFactor;
+  const speedSlider = document.getElementById('speedSlider');
+  if (speedSlider) speedSlider.value = currentValues.speedFactor;
+  const randomnessInput = document.getElementById('randomnessInput');
+  if (randomnessInput) randomnessInput.value = currentValues.randomnessFactor;
+  const randomnessSlider = document.getElementById('randomnessSlider');
+  if (randomnessSlider) randomnessSlider.value = currentValues.randomnessFactor;
+  const mistakeInput = document.getElementById('mistakeInput');
+  if (mistakeInput) mistakeInput.value = currentValues.mistakeProbability;
+  const mistakeSlider = document.getElementById('mistakeSlider');
+  if (mistakeSlider) mistakeSlider.value = currentValues.mistakeProbability;
   updateRestoreButtons();
 }
 
@@ -659,55 +720,6 @@ case 'randomnessFactor':
 default:
       return advancedSettings[settingKey];
   }
-}
-
-function restoreDefaultValue(settingKey) {
-  const defaultValue = DEFAULT_VALUES[settingKey];
-switch(settingKey) {
-    case 'speedFactor':
-      speedFactor = defaultValue;
-      saveSpeedFactor();
-      break;
-case 'randomnessFactor':
-      randomnessFactor = defaultValue;
-      saveRandomnessFactor();
-      break;
-case 'mistakeProbability':
-      mistakeProbability = defaultValue;
-      saveMistakeProbability();
-      break;
-default:
-      advancedSettings[settingKey] = defaultValue;
-      // Update the input field immediately
-      const inputElement = elements[settingKey + 'Input'];
-if (inputElement) {
-        inputElement.value = defaultValue;
-      }
-      break;
-}
-  
-  updateAdvancedDisplay();
-  updateRestoreButtons();
-  updateApplyAdvancedOptionsBtnState(); // <-- Add this line
-}
-
-function updateRestoreButtons() {
-  // Update restore buttons for main parameters
-  updateRestoreButton('speedFactor', elements.advancedSpeedInput, true);
-updateRestoreButton('randomnessFactor', elements.advancedRandomnessInput, true);
-  updateRestoreButton('mistakeProbability', elements.advancedMistakeInput, true);
-  
-  // Update restore buttons for advanced parameters
-  updateRestoreButton('immediateFixPercentage', elements.immediateFixPercentageInput);
-  updateRestoreButton('minCharsBeforeReview', elements.minCharsBeforeReviewInput);
-  updateRestoreButton('maxCharsBeforeReview', elements.maxCharsBeforeReviewInput);
-updateRestoreButton('minReviewPause', elements.minReviewPauseInput);
-  updateRestoreButton('maxReviewPause', elements.maxReviewPauseInput);
-  updateRestoreButton('minImmediateFixPause', elements.minImmediateFixPauseInput);
-  updateRestoreButton('maxImmediateFixPause', elements.maxImmediateFixPauseInput);
-  updateRestoreButton('minBetweenFixPause', elements.minBetweenFixPauseInput);
-  updateRestoreButton('maxBetweenFixPause', elements.maxBetweenFixPauseInput);
-  updateRestoreButton('allowWordNavigation', elements.allowWordNavigationInput);
 }
 
 function updateRestoreButton(settingKey, inputElement, isPercentage = false) {
@@ -829,7 +841,6 @@ elements.mistakeInput.addEventListener('change', handleMistakeInputChange);
       if (!isNaN(newValue) && newValue >= 10 && newValue <= 200) {
         speedFactor = newValue / 100;
         saveSpeedFactor();
-        updateRestoreButton('speedFactor', elements.advancedSpeedInput, true);
       }
       updateApplyAdvancedOptionsBtnState();
     });
@@ -842,7 +853,6 @@ elements.mistakeInput.addEventListener('change', handleMistakeInputChange);
       if (!isNaN(newValue) && newValue >= 10 && newValue <= 200) {
         randomnessFactor = newValue / 100;
         saveRandomnessFactor();
-        updateRestoreButton('randomnessFactor', elements.advancedRandomnessInput, true);
       }
       updateApplyAdvancedOptionsBtnState();
     });
@@ -855,7 +865,6 @@ elements.mistakeInput.addEventListener('change', handleMistakeInputChange);
       if (!isNaN(newValue) && newValue >= 0 && newValue <= 20) {
         mistakeProbability = newValue / 100;
         saveMistakeProbability();
-        updateRestoreButton('mistakeProbability', elements.advancedMistakeInput, true);
       }
       updateApplyAdvancedOptionsBtnState();
     });
