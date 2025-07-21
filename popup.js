@@ -23,7 +23,6 @@ const DEFAULT_VALUES = {
   maxImmediateFixPause: 400,
   minBetweenFixPause: 100,
   maxBetweenFixPause: 300,
-  allowSelection: true,
   allowWordNavigation: true
 };
 // Advanced settings defaults
@@ -37,7 +36,6 @@ let advancedSettings = {
   maxImmediateFixPause: DEFAULT_VALUES.maxImmediateFixPause,
   minBetweenFixPause: DEFAULT_VALUES.minBetweenFixPause,
   maxBetweenFixPause: DEFAULT_VALUES.maxBetweenFixPause,
-  allowSelection: DEFAULT_VALUES.allowSelection,
   allowWordNavigation: DEFAULT_VALUES.allowWordNavigation
 };
 // Store snapshot of advanced options when modal opens
@@ -56,7 +54,6 @@ function getCurrentAdvancedOptions() {
     maxImmediateFixPause: advancedSettings.maxImmediateFixPause,
     minBetweenFixPause: advancedSettings.minBetweenFixPause,
     maxBetweenFixPause: advancedSettings.maxBetweenFixPause,
-    allowSelection: advancedSettings.allowSelection,
     allowWordNavigation: advancedSettings.allowWordNavigation
   };
 }
@@ -135,7 +132,6 @@ mistakeInput: document.getElementById('mistakeInput'),
   maxImmediateFixPauseInput: document.getElementById('maxImmediateFixPauseInput'),
   minBetweenFixPauseInput: document.getElementById('minBetweenFixPauseInput'),
   maxBetweenFixPauseInput: document.getElementById('maxBetweenFixPauseInput'),
-  allowSelectionInput: document.getElementById('allowSelectionInput'),
   allowWordNavigationInput: document.getElementById('allowWordNavigationInput')
 };
 // Helper functions for modal animations
@@ -257,9 +253,6 @@ function updateAdvancedDisplay() {
 }
   if (elements.maxBetweenFixPauseInput) {
     elements.maxBetweenFixPauseInput.value = advancedSettings.maxBetweenFixPause;
-}
-  if (elements.allowSelectionInput) {
-    elements.allowSelectionInput.checked = advancedSettings.allowSelection;
 }
   if (elements.allowWordNavigationInput) {
     elements.allowWordNavigationInput.checked = advancedSettings.allowWordNavigation;
@@ -415,7 +408,6 @@ updateRestoreButton('minReviewPause', elements.minReviewPauseInput);
   updateRestoreButton('maxImmediateFixPause', elements.maxImmediateFixPauseInput);
   updateRestoreButton('minBetweenFixPause', elements.minBetweenFixPauseInput);
   updateRestoreButton('maxBetweenFixPause', elements.maxBetweenFixPauseInput);
-  updateRestoreButton('allowSelection', elements.allowSelectionInput);
   updateRestoreButton('allowWordNavigation', elements.allowWordNavigationInput);
 }
 
@@ -586,7 +578,6 @@ elements.mistakeInput.addEventListener('change', handleMistakeInputChange);
         if (elements.maxImmediateFixPauseInput) elements.maxImmediateFixPauseInput.value = advancedOptionsSnapshot.maxImmediateFixPause;
         if (elements.minBetweenFixPauseInput) elements.minBetweenFixPauseInput.value = advancedOptionsSnapshot.minBetweenFixPause;
         if (elements.maxBetweenFixPauseInput) elements.maxBetweenFixPauseInput.value = advancedOptionsSnapshot.maxBetweenFixPause;
-        if (elements.allowSelectionInput) elements.allowSelectionInput.checked = advancedOptionsSnapshot.allowSelection;
         if (elements.allowWordNavigationInput) elements.allowWordNavigationInput.checked = advancedOptionsSnapshot.allowWordNavigation;
         updateRestoreButtons();
         updateApplyAdvancedOptionsBtnState();
@@ -700,14 +691,6 @@ elements.mistakeInput.addEventListener('change', handleMistakeInputChange);
         advancedSettings.maxBetweenFixPause = newValue;
         updateRestoreButton('maxBetweenFixPause', elements.maxBetweenFixPauseInput);
       }
-      updateApplyAdvancedOptionsBtnState();
-    });
-}
-  
-  if (elements.allowSelectionInput) {
-    elements.allowSelectionInput.addEventListener('change', function() {
-      advancedSettings.allowSelection = elements.allowSelectionInput.checked;
-      updateRestoreButton('allowSelection', elements.allowSelectionInput);
       updateApplyAdvancedOptionsBtnState();
     });
 }

@@ -16,7 +16,6 @@ let currentMistakeProbability = 0.03; // Default: 3%
 
 // Advanced settings with defaults
 const ADVANCED_DEFAULTS = {
-    allowSelection: true,
     allowWordNavigation: true,
     immediateFixPercentage: 75,
     minCharsBeforeReview: 5,
@@ -31,7 +30,7 @@ const ADVANCED_DEFAULTS = {
 let advancedSettings = {...ADVANCED_DEFAULTS};
 
 // Load settings from chrome.storage.local when script initializes
-chrome.storage.local.get(['speedFactor', 'randomnessFactor', 'mistakeProbability', 'allowSelection', 'allowWordNavigation', 'immediateFixPercentage', 'minCharsBeforeReview', 'maxCharsBeforeReview', 'minReviewPause', 'maxReviewPause', 'minImmediateFixPause', 'maxImmediateFixPause', 'minBetweenFixPause', 'maxBetweenFixPause', 'advancedSettings'], function(result) {
+chrome.storage.local.get(['speedFactor', 'randomnessFactor', 'mistakeProbability', 'allowWordNavigation', 'immediateFixPercentage', 'minCharsBeforeReview', 'maxCharsBeforeReview', 'minReviewPause', 'maxReviewPause', 'minImmediateFixPause', 'maxImmediateFixPause', 'minBetweenFixPause', 'maxBetweenFixPause', 'advancedSettings'], function(result) {
     if (result.speedFactor !== undefined) {
         currentSpeedFactor = result.speedFactor;
     }
@@ -263,7 +262,7 @@ async function reviewAndFixMistakes(state) {
         console.log(`[DEBUG] Fixing mistake at session-relative pos ${pos} (absolute ${absolutePos}): "${state.mistakeLog[idx].wrong}" -> "${correct}"`);
         const currentPos = getCaretPosition(state.activeElement);
         console.log(`[DEBUG] Moving caret from ${currentPos} to ${absolutePos + 1}`);
-        await hybridNavigateToPosition(state.activeElement, absolutePos + 1, currentPos, advancedSettings.allowSelection, advancedSettings.allowWordNavigation);
+        await hybridNavigateToPosition(state.activeElement, absolutePos + 1, currentPos, advancedSettings.allowWordNavigation);
         console.log('[DEBUG] Performing backspace');
         const beforeText = isTextInput(state.activeElement) ? state.activeElement.value : state.activeElement.innerText;
         stealthyBackspace(state.activeElement);
@@ -295,7 +294,7 @@ async function reviewAndFixMistakes(state) {
 }
 
 // Arrow key navigation function (async, stepwise, human-like)
-async function navigateWithArrowKeys(el, targetPos, currentPos, allowSelection = false, allowWordNavigation = false) {
+async function navigateWithArrowKeys(el, targetPos, currentPos, allowWordNavigation = false) {
     const steps = Math.abs(targetPos - currentPos);
     if (steps === 0) return;
     let pos = currentPos;
@@ -326,7 +325,6 @@ async function navigateWithArrowKeys(el, targetPos, currentPos, allowSelection =
             bubbles: true,
             cancelable: true
         };
-        if (allowSelection) eventOptions.shiftKey = true;
         if (allowWordNavigation) eventOptions.ctrlKey = true;
         const event = new KeyboardEvent('keydown', eventOptions);
         el.dispatchEvent(event);
@@ -339,7 +337,7 @@ async function navigateWithArrowKeys(el, targetPos, currentPos, allowSelection =
 }
 
 // Hybrid navigation: use word navigation for big jumps, then character navigation for fine-tuning
-async function hybridNavigateToPosition(el, targetPos, currentPos, allowSelection = false, allowWordNavigation = false) {
+async function hybridNavigateToPosition(el, targetPos, currentPos, allowWordNavigation = false) {
     let pos = currentPos;
     // Use word navigation for big jumps
     if (allowWordNavigation && Math.abs(targetPos - pos) > 5) {
@@ -354,13 +352,13 @@ async function hybridNavigateToPosition(el, targetPos, currentPos, allowSelectio
                 if (nextPos < targetPos) nextPos = targetPos;
             }
             if (nextPos === pos) break; // can't move further by word
-            await navigateWithArrowKeys(el, nextPos, pos, allowSelection, true);
+            await navigateWithArrowKeys(el, nextPos, pos, true);
             pos = nextPos;
         }
     }
     // Fine-tune with character navigation
     if (pos !== targetPos) {
-        await navigateWithArrowKeys(el, targetPos, pos, allowSelection, false);
+        await navigateWithArrowKeys(el, targetPos, pos, false);
     }
 }
 
