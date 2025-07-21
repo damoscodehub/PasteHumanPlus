@@ -9,22 +9,27 @@ let menuStrings = {
   stop: "."
 };
 
-// Centralized default values for all parameters
-const DEFAULT_VALUES = {
-  speedFactor: 1.0,
-  randomnessFactor: 1.0,
-  mistakeProbability: 0.03,
-  immediateFixPercentage: 75,
-  minCharsBeforeReview: 5,
-  maxCharsBeforeReview: 15,
-  minReviewPause: 1000,
-  maxReviewPause: 3000,
-  minImmediateFixPause: 100,
-  maxImmediateFixPause: 400,
-  minBetweenFixPause: 100,
-  maxBetweenFixPause: 300,
-  allowWordNavigation: true
+// Centralized configuration for all parameters
+const PARAM_CONFIG = {
+  speedFactor: { default: 1.0, min: 10, max: 200 },
+  randomnessFactor: { default: 1.0, min: 10, max: 200 },
+  mistakeProbability: { default: 0.03, min: 0, max: 20 },
+  immediateFixPercentage: { default: 75, min: 0, max: 100 },
+  minCharsBeforeReview: { default: 5, min: 1, max: 50 },
+  maxCharsBeforeReview: { default: 15, min: 1, max: 50 },
+  minReviewPause: { default: 2000, min: 10, max: 10000 },
+  maxReviewPause: { default: 5000, min: 10, max: 10000 },
+  minImmediateFixPause: { default: 500, min: 10, max: 10000 },
+  maxImmediateFixPause: { default: 3000, min: 10, max: 10000 },
+  minBetweenFixPause: { default: 1000, min: 10, max: 10000 },
+  maxBetweenFixPause: { default: 3000, min: 10, max: 10000 },
+  allowWordNavigation: { default: true }
 };
+
+// Extract default values for backward compatibility
+const DEFAULT_VALUES = Object.fromEntries(
+  Object.entries(PARAM_CONFIG).map(([key, config]) => [key, config.default])
+);
 // Advanced settings defaults
 let advancedSettings = {
   immediateFixPercentage: DEFAULT_VALUES.immediateFixPercentage,
@@ -72,13 +77,128 @@ for (const key in current) {
 function updateApplyAdvancedOptionsBtnState() {
   const btn = elements.applyAdvancedOptionsBtn;
   if (!btn) return;
-if (isAdvancedOptionsChanged()) {
+  if (isAdvancedOptionsChanged() && allAdvancedInputsValid()) {
     btn.disabled = false;
     btn.classList.remove('disabled');
   } else {
     btn.disabled = true;
     btn.classList.add('disabled');
+  }
+  
+  // Show/hide restore defaults button based on whether any values differ from defaults
+  const hasNonDefaultValues = checkForNonDefaultValues();
+  if (elements.restoreDefaultsBtn) {
+    elements.restoreDefaultsBtn.style.display = hasNonDefaultValues ? 'block' : 'none';
+  }
 }
+
+function checkForNonDefaultValues() {
+  // Use the centralized DEFAULT_VALUES for consistency
+  const defaultValues = {
+    speedFactor: DEFAULT_VALUES.speedFactor * 100, // Convert to percentage
+    randomnessFactor: DEFAULT_VALUES.randomnessFactor * 100, // Convert to percentage
+    mistakeProbability: DEFAULT_VALUES.mistakeProbability * 100, // Convert to percentage
+    allowWordNavigation: DEFAULT_VALUES.allowWordNavigation,
+    immediateFixPercentage: DEFAULT_VALUES.immediateFixPercentage,
+    minCharsBeforeReview: DEFAULT_VALUES.minCharsBeforeReview,
+    maxCharsBeforeReview: DEFAULT_VALUES.maxCharsBeforeReview,
+    minReviewPause: DEFAULT_VALUES.minReviewPause,
+    maxReviewPause: DEFAULT_VALUES.maxReviewPause,
+    minImmediateFixPause: DEFAULT_VALUES.minImmediateFixPause,
+    maxImmediateFixPause: DEFAULT_VALUES.maxImmediateFixPause,
+    minBetweenFixPause: DEFAULT_VALUES.minBetweenFixPause,
+    maxBetweenFixPause: DEFAULT_VALUES.maxBetweenFixPause
+  };
+  
+  // Check if any current value differs from default
+  for (const [key, defaultValue] of Object.entries(defaultValues)) {
+    if (key === 'allowWordNavigation') {
+      if (advancedSettings[key] !== defaultValue) return true;
+    } else if (key === 'speedFactor' || key === 'randomnessFactor' || key === 'mistakeProbability') {
+      // These are stored as decimals but compared as percentages
+      const currentValue = key === 'speedFactor' ? speedFactor * 100 : 
+                          key === 'randomnessFactor' ? randomnessFactor * 100 : 
+                          mistakeProbability * 100;
+      if (Math.round(currentValue) !== defaultValue) return true;
+    } else {
+      if (parseInt(advancedSettings[key]) !== defaultValue) return true;
+    }
+  }
+  return false;
+}
+
+function restoreAllDefaults() {
+  // Restore all advanced settings to default values using centralized DEFAULT_VALUES
+  advancedSettings = {
+    allowWordNavigation: DEFAULT_VALUES.allowWordNavigation,
+    immediateFixPercentage: DEFAULT_VALUES.immediateFixPercentage,
+    minCharsBeforeReview: DEFAULT_VALUES.minCharsBeforeReview,
+    maxCharsBeforeReview: DEFAULT_VALUES.maxCharsBeforeReview,
+    minReviewPause: DEFAULT_VALUES.minReviewPause,
+    maxReviewPause: DEFAULT_VALUES.maxReviewPause,
+    minImmediateFixPause: DEFAULT_VALUES.minImmediateFixPause,
+    maxImmediateFixPause: DEFAULT_VALUES.maxImmediateFixPause,
+    minBetweenFixPause: DEFAULT_VALUES.minBetweenFixPause,
+    maxBetweenFixPause: DEFAULT_VALUES.maxBetweenFixPause
+  };
+  
+  // Restore main settings (these are stored separately)
+  speedFactor = DEFAULT_VALUES.speedFactor;
+  randomnessFactor = DEFAULT_VALUES.randomnessFactor;
+  mistakeProbability = DEFAULT_VALUES.mistakeProbability;
+  
+  // Update all UI elements to reflect the default values
+  updateAdvancedDisplay();
+  updateSpeedDisplay();
+  updateRandomnessDisplay();
+  updateMistakeDisplay();
+  
+  // Update the button states
+  updateApplyAdvancedOptionsBtnState();
+}
+
+// === DYNAMIC ADVANCED TOOLTIP ENHANCEMENT ===
+// Map input IDs to PARAM_CONFIG keys and descriptions
+const ADVANCED_OPTION_ROWS = [
+  { rowId: 'advancedSpeedInput', key: 'speedFactor', desc: 'Typing speed multiplier (higher = faster typing)' },
+  { rowId: 'advancedRandomnessInput', key: 'randomnessFactor', desc: 'Randomness of typing delays (higher = more variation in timing)' },
+  { rowId: 'advancedMistakeInput', key: 'mistakeProbability', desc: 'Probability of making typing mistakes (0-20%)' },
+  { rowId: 'immediateFixPercentageInput', key: 'immediateFixPercentage', desc: 'Percentage of mistakes fixed immediately vs. delayed' },
+  { rowId: 'minCharsBeforeReviewInput', key: 'minCharsBeforeReview', desc: 'Minimum characters typed before triggering review phase' },
+  { rowId: 'maxCharsBeforeReviewInput', key: 'maxCharsBeforeReview', desc: 'Maximum characters typed before triggering review phase' },
+  { rowId: 'minReviewPauseInput', key: 'minReviewPause', desc: 'Minimum pause duration before review phase (milliseconds)' },
+  { rowId: 'maxReviewPauseInput', key: 'maxReviewPause', desc: 'Maximum pause duration before review phase (milliseconds)' },
+  { rowId: 'minImmediateFixPauseInput', key: 'minImmediateFixPause', desc: 'Minimum pause before immediate fix (milliseconds)' },
+  { rowId: 'maxImmediateFixPauseInput', key: 'maxImmediateFixPause', desc: 'Maximum pause before immediate fix (milliseconds)' },
+  { rowId: 'minBetweenFixPauseInput', key: 'minBetweenFixPause', desc: 'Minimum pause between fixes during review (milliseconds)' },
+  { rowId: 'maxBetweenFixPauseInput', key: 'maxBetweenFixPause', desc: 'Maximum pause between fixes during review (milliseconds)' },
+  { rowId: 'allowWordNavigationInput', key: 'allowWordNavigation', desc: 'Allow using Ctrl+Arrow to jump word-by-word during navigation' }
+];
+
+function updateAdvancedOptionTooltips() {
+  console.log('PARAM_CONFIG keys:', Object.keys(PARAM_CONFIG));
+  ADVANCED_OPTION_ROWS.forEach(opt => {
+    const input = document.getElementById(opt.rowId);
+    if (!input) {
+      console.log('Input not found for rowId:', opt.rowId);
+      return;
+    }
+    // Find the parent <tr>
+    let tr = input.closest('tr');
+    if (!tr) return;
+    const config = PARAM_CONFIG[opt.key];
+    console.log('Tooltip debug:', {rowId: opt.rowId, key: opt.key, config});
+    let tooltip = opt.desc;
+    if (config) {
+      if (typeof config.default === 'boolean') {
+        tooltip += ` (Default: ${config.default ? 'Enabled' : 'Disabled'})`;
+      } else {
+        tooltip += ` (Min: ${config.min}, Max: ${config.max}, Default: ${config.default})`;
+      }
+    }
+    console.log('Final tooltip:', tooltip);
+    tr.title = tooltip;
+  });
 }
 
 // DOM elements
@@ -113,6 +233,7 @@ const elements = {
   applyMenuStringsBtn: document.getElementById('applyMenuStringsBtn'),
   cancelAdvancedOptionsBtn: document.getElementById('cancelAdvancedOptionsBtn'),
   applyAdvancedOptionsBtn: document.getElementById('applyAdvancedOptionsBtn'),
+  restoreDefaultsBtn: document.getElementById('restoreDefaultsBtn'),
   shortcutsLink: document.getElementById('shortcutsLink'),
   
 mistakeInput: document.getElementById('mistakeInput'),
@@ -134,12 +255,110 @@ mistakeInput: document.getElementById('mistakeInput'),
   maxBetweenFixPauseInput: document.getElementById('maxBetweenFixPauseInput'),
   allowWordNavigationInput: document.getElementById('allowWordNavigationInput')
 };
+// Add or update floating error tooltip above input
+function setInputError(input, message) {
+  let tooltip = input.parentElement.querySelector('.input-error-tooltip');
+  if (!tooltip) {
+    tooltip = document.createElement('div');
+    tooltip.className = 'input-error-tooltip';
+    input.parentElement.appendChild(tooltip);
+  }
+  tooltip.textContent = message;
+  input.classList.add('input-invalid');
+}
+
+function clearInputError(input) {
+  let tooltip = input.parentElement.querySelector('.input-error-tooltip');
+  if (tooltip) tooltip.textContent = '';
+  input.classList.remove('input-invalid');
+}
+
+function validateAndUpdateSetting(inputElement, settingKey) {
+  const config = PARAM_CONFIG[settingKey];
+  let value = inputElement.value;
+  let valid = true;
+  let errorMsg = '';
+  if (inputElement.type === 'number') {
+    if (value === '' || isNaN(Number(value))) {
+      valid = false;
+      errorMsg = 'Please enter a valid number.';
+    } else {
+      value = Number(value);
+      if (typeof config.min === 'number' && value < config.min) {
+        valid = false;
+        errorMsg = `Value must be at least ${config.min}.`;
+      } else if (typeof config.max === 'number' && value > config.max) {
+        valid = false;
+        errorMsg = `Value must be at most ${config.max}.`;
+      }
+    }
+    if (!valid) {
+      setInputError(inputElement, errorMsg);
+    } else {
+      clearInputError(inputElement);
+      advancedSettings[settingKey] = value;
+    }
+  } else {
+    // For checkboxes, always valid
+    clearInputError(inputElement);
+    advancedSettings[settingKey] = inputElement.checked;
+  }
+  updateRestoreButton(settingKey, inputElement);
+  updateApplyAdvancedOptionsBtnState();
+  return valid;
+}
+
+// Check all advanced number inputs for validity
+function allAdvancedInputsValid() {
+  return ADVANCED_OPTION_ROWS.every(opt => {
+    const input = document.getElementById(opt.rowId);
+    if (!input || input.type !== 'number') return true;
+    return !input.classList.contains('input-invalid');
+  });
+}
+
+// Update Apply button state based on input validity
+function updateApplyAdvancedOptionsBtnState() {
+  const btn = elements.applyAdvancedOptionsBtn;
+  if (!btn) return;
+  if (isAdvancedOptionsChanged() && allAdvancedInputsValid()) {
+    btn.disabled = false;
+    btn.classList.remove('disabled');
+  } else {
+    btn.disabled = true;
+    btn.classList.add('disabled');
+  }
+  // Show/hide restore defaults button based on whether any values differ from defaults
+  const hasNonDefaultValues = checkForNonDefaultValues();
+  if (elements.restoreDefaultsBtn) {
+    elements.restoreDefaultsBtn.style.display = hasNonDefaultValues ? 'block' : 'none';
+  }
+}
+
+// Attach real-time validation to all advanced number inputs
+function attachAdvancedInputValidation() {
+  ADVANCED_OPTION_ROWS.forEach(opt => {
+    const input = document.getElementById(opt.rowId);
+    if (!input || input.type !== 'number') return;
+    input.addEventListener('input', () => validateAndUpdateSetting(input, opt.key));
+    // Initial validation
+    validateAndUpdateSetting(input, opt.key);
+  });
+}
+
 // Helper functions for modal animations
 function showModal(modal) {
+  console.log('showModal called for modal:', modal && modal.id);
+  console.log('modal.id value:', modal.id, 'type:', typeof modal.id, 'modal object:', modal);
   modal.style.display = 'flex';
 setTimeout(() => {
     modal.classList.add('show');
   }, 10);
+  if (modal.id === 'advancedOptionsModal') {
+    console.log('advancedOptionsModal block entered, calling updateAdvancedOptionTooltips');
+    updateAdvancedOptionTooltips();
+    attachAdvancedInputValidation();
+  }
 }
 
 function hideModal(modal) {
@@ -155,28 +374,108 @@ document.addEventListener('DOMContentLoaded', function() {
   loadSettings();
   setupEventListeners();
 });
+
+function populateHtmlDefaults() {
+  // Populate HTML input values and constraints from PARAM_CONFIG to ensure consistency
+  if (elements.advancedSpeedInput) {
+    elements.advancedSpeedInput.value = Math.round(DEFAULT_VALUES.speedFactor * 100);
+    elements.advancedSpeedInput.min = PARAM_CONFIG.speedFactor.min;
+    elements.advancedSpeedInput.max = PARAM_CONFIG.speedFactor.max;
+  }
+  if (elements.advancedRandomnessInput) {
+    elements.advancedRandomnessInput.value = Math.round(DEFAULT_VALUES.randomnessFactor * 100);
+    elements.advancedRandomnessInput.min = PARAM_CONFIG.randomnessFactor.min;
+    elements.advancedRandomnessInput.max = PARAM_CONFIG.randomnessFactor.max;
+  }
+  if (elements.advancedMistakeInput) {
+    elements.advancedMistakeInput.value = Math.round(DEFAULT_VALUES.mistakeProbability * 100);
+    elements.advancedMistakeInput.min = PARAM_CONFIG.mistakeProbability.min;
+    elements.advancedMistakeInput.max = PARAM_CONFIG.mistakeProbability.max;
+  }
+  if (elements.immediateFixPercentageInput) {
+    elements.immediateFixPercentageInput.value = DEFAULT_VALUES.immediateFixPercentage;
+    elements.immediateFixPercentageInput.min = PARAM_CONFIG.immediateFixPercentage.min;
+    elements.immediateFixPercentageInput.max = PARAM_CONFIG.immediateFixPercentage.max;
+  }
+  if (elements.minCharsBeforeReviewInput) {
+    elements.minCharsBeforeReviewInput.value = DEFAULT_VALUES.minCharsBeforeReview;
+    elements.minCharsBeforeReviewInput.min = PARAM_CONFIG.minCharsBeforeReview.min;
+    elements.minCharsBeforeReviewInput.max = PARAM_CONFIG.minCharsBeforeReview.max;
+  }
+  if (elements.maxCharsBeforeReviewInput) {
+    elements.maxCharsBeforeReviewInput.value = DEFAULT_VALUES.maxCharsBeforeReview;
+    elements.maxCharsBeforeReviewInput.min = PARAM_CONFIG.maxCharsBeforeReview.min;
+    elements.maxCharsBeforeReviewInput.max = PARAM_CONFIG.maxCharsBeforeReview.max;
+  }
+  if (elements.minReviewPauseInput) {
+    elements.minReviewPauseInput.value = DEFAULT_VALUES.minReviewPause;
+    elements.minReviewPauseInput.min = PARAM_CONFIG.minReviewPause.min;
+    elements.minReviewPauseInput.max = PARAM_CONFIG.minReviewPause.max;
+  }
+  if (elements.maxReviewPauseInput) {
+    elements.maxReviewPauseInput.value = DEFAULT_VALUES.maxReviewPause;
+    elements.maxReviewPauseInput.min = PARAM_CONFIG.maxReviewPause.min;
+    elements.maxReviewPauseInput.max = PARAM_CONFIG.maxReviewPause.max;
+  }
+  if (elements.minImmediateFixPauseInput) {
+    elements.minImmediateFixPauseInput.value = DEFAULT_VALUES.minImmediateFixPause;
+    elements.minImmediateFixPauseInput.min = PARAM_CONFIG.minImmediateFixPause.min;
+    elements.minImmediateFixPauseInput.max = PARAM_CONFIG.minImmediateFixPause.max;
+  }
+  if (elements.maxImmediateFixPauseInput) {
+    elements.maxImmediateFixPauseInput.value = DEFAULT_VALUES.maxImmediateFixPause;
+    elements.maxImmediateFixPauseInput.min = PARAM_CONFIG.maxImmediateFixPause.min;
+    elements.maxImmediateFixPauseInput.max = PARAM_CONFIG.maxImmediateFixPause.max;
+  }
+  if (elements.minBetweenFixPauseInput) {
+    elements.minBetweenFixPauseInput.value = DEFAULT_VALUES.minBetweenFixPause;
+    elements.minBetweenFixPauseInput.min = PARAM_CONFIG.minBetweenFixPause.min;
+    elements.minBetweenFixPauseInput.max = PARAM_CONFIG.minBetweenFixPause.max;
+  }
+  if (elements.maxBetweenFixPauseInput) {
+    elements.maxBetweenFixPauseInput.value = DEFAULT_VALUES.maxBetweenFixPause;
+    elements.maxBetweenFixPauseInput.min = PARAM_CONFIG.maxBetweenFixPause.min;
+    elements.maxBetweenFixPauseInput.max = PARAM_CONFIG.maxBetweenFixPause.max;
+  }
+  if (elements.allowWordNavigationInput) {
+    elements.allowWordNavigationInput.checked = DEFAULT_VALUES.allowWordNavigation;
+  }
+}
 function loadSettings() {
   chrome.storage.local.get(['speedFactor', 'randomnessFactor', 'mistakeProbability', 'menuStrings', 'advancedSettings'], function(result) {
+    let hasStoredSettings = false;
+    
     if (result.speedFactor !== undefined) {
       speedFactor = result.speedFactor;
+      hasStoredSettings = true;
     }
     if (result.randomnessFactor !== undefined) {
       randomnessFactor = result.randomnessFactor;
+      hasStoredSettings = true;
     }
     if (result.mistakeProbability !== undefined) {
       mistakeProbability = result.mistakeProbability;
+      hasStoredSettings = true;
     }
     if (result.menuStrings) {
       menuStrings = result.menuStrings;
     }
     if (result.advancedSettings) {
-      
-advancedSettings = {...advancedSettings, ...result.advancedSettings};
+      advancedSettings = {...advancedSettings, ...result.advancedSettings};
+      hasStoredSettings = true;
     }
-    updateSpeedDisplay();
-    updateRandomnessDisplay();
-    updateMistakeDisplay();
-    updateAdvancedDisplay();
+    
+    if (hasStoredSettings) {
+      // Only update displays if we have stored settings
+      updateSpeedDisplay();
+      updateRandomnessDisplay();
+      updateMistakeDisplay();
+      updateAdvancedDisplay();
+    } else {
+      // Use defaults if no stored settings
+      populateHtmlDefaults();
+    }
+    
     updateContextMenuInstructions();
     loadShortcuts();
   });
@@ -429,7 +728,7 @@ if (isDifferent) {
       restoreButton = document.createElement('button');
       restoreButton.className = 'restore-default-btn';
 restoreButton.innerHTML = '↺';
-      restoreButton.title = `Value changed from default (${defaultValue}${isPercentage ? '%' : ''}). Click to restore default.`;
+      restoreButton.title = ` Click to restore default (${defaultValue}${isPercentage ? '%' : ''}).`;
 restoreButton.addEventListener('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
@@ -593,107 +892,126 @@ elements.mistakeInput.addEventListener('change', handleMistakeInputChange);
       advancedOptionsSnapshot = getCurrentAdvancedOptions();
       updateApplyAdvancedOptionsBtnState();
     });
-}
+  }
+  
+  if (elements.restoreDefaultsBtn) {
+    elements.restoreDefaultsBtn.addEventListener('click', function() {
+      restoreAllDefaults();
+    });
+  }
   
   // Advanced parameter input listeners
   if (elements.immediateFixPercentageInput) {
-    elements.immediateFixPercentageInput.addEventListener('change', function() {
-      let newValue = parseInt(elements.immediateFixPercentageInput.value);
-      if (!isNaN(newValue) && newValue >= 0 && newValue <= 100) {
-        advancedSettings.immediateFixPercentage = newValue;
-        updateRestoreButton('immediateFixPercentage', elements.immediateFixPercentageInput);
-      }
+    elements.immediateFixPercentageInput.addEventListener('input', function() {
+      validateAndUpdateSetting(this, 'immediateFixPercentage');
       updateApplyAdvancedOptionsBtnState();
     });
-}
+    elements.immediateFixPercentageInput.addEventListener('change', function() {
+      validateAndUpdateSetting(this, 'immediateFixPercentage');
+      updateApplyAdvancedOptionsBtnState();
+    });
+  }
   
   if (elements.minCharsBeforeReviewInput) {
-    elements.minCharsBeforeReviewInput.addEventListener('change', function() {
-      let newValue = parseInt(elements.minCharsBeforeReviewInput.value);
-      if (!isNaN(newValue) && newValue >= 1 && newValue <= 50) {
-        advancedSettings.minCharsBeforeReview = newValue;
-        updateRestoreButton('minCharsBeforeReview', elements.minCharsBeforeReviewInput);
-      }
+    elements.minCharsBeforeReviewInput.addEventListener('input', function() {
+      validateAndUpdateSetting(this, 'minCharsBeforeReview');
       updateApplyAdvancedOptionsBtnState();
     });
-}
+    elements.minCharsBeforeReviewInput.addEventListener('change', function() {
+      validateAndUpdateSetting(this, 'minCharsBeforeReview');
+      updateApplyAdvancedOptionsBtnState();
+    });
+  }
   
   if (elements.maxCharsBeforeReviewInput) {
-    elements.maxCharsBeforeReviewInput.addEventListener('change', function() {
-      let newValue = parseInt(elements.maxCharsBeforeReviewInput.value);
-      if (!isNaN(newValue) && newValue >= 1 && newValue <= 50) {
-        advancedSettings.maxCharsBeforeReview = newValue;
-        updateRestoreButton('maxCharsBeforeReview', elements.maxCharsBeforeReviewInput);
-      }
+    elements.maxCharsBeforeReviewInput.addEventListener('input', function() {
+      validateAndUpdateSetting(this, 'maxCharsBeforeReview');
       updateApplyAdvancedOptionsBtnState();
     });
-}
+    elements.maxCharsBeforeReviewInput.addEventListener('change', function() {
+      validateAndUpdateSetting(this, 'maxCharsBeforeReview');
+      updateApplyAdvancedOptionsBtnState();
+    });
+  }
   
   if (elements.minReviewPauseInput) {
-    elements.minReviewPauseInput.addEventListener('change', function() {
-      let newValue = parseInt(elements.minReviewPauseInput.value);
-      if (!isNaN(newValue) && newValue >= 100 && newValue <= 10000) {
-        advancedSettings.minReviewPause = newValue;
-        updateRestoreButton('minReviewPause', elements.minReviewPauseInput);
-      }
+    elements.minReviewPauseInput.addEventListener('input', function() {
+      validateAndUpdateSetting(this, 'minReviewPause');
       updateApplyAdvancedOptionsBtnState();
     });
-}
+    elements.minReviewPauseInput.addEventListener('change', function() {
+      validateAndUpdateSetting(this, 'minReviewPause');
+      updateApplyAdvancedOptionsBtnState();
+    });
+  }
   
   if (elements.maxReviewPauseInput) {
+    elements.maxReviewPauseInput.addEventListener('input', function() {
+      validateAndUpdateSetting(this, 'maxReviewPause');
+      updateApplyAdvancedOptionsBtnState();
+    });
     elements.maxReviewPauseInput.addEventListener('change', function() {
-      let newValue = parseInt(elements.maxReviewPauseInput.value);
-      if (!isNaN(newValue) && newValue >= 100 && newValue <= 10000) {
-        advancedSettings.maxReviewPause = newValue;
-        updateRestoreButton('maxReviewPause', elements.maxReviewPauseInput);
-      }
+      validateAndUpdateSetting(this, 'maxReviewPause');
       updateApplyAdvancedOptionsBtnState();
     });
-}
+  }
   
+  // Centralized validation function
+  function validateAndUpdateSetting(inputElement, settingKey) {
+    const newValue = parseInt(inputElement.value);
+    const config = PARAM_CONFIG[settingKey];
+    
+    if (!isNaN(newValue) && newValue >= config.min && newValue <= config.max) {
+      advancedSettings[settingKey] = newValue;
+      updateRestoreButton(settingKey, inputElement);
+      return true;
+    }
+    return false;
+  }
+
   if (elements.minImmediateFixPauseInput) {
-    elements.minImmediateFixPauseInput.addEventListener('change', function() {
-      let newValue = parseInt(elements.minImmediateFixPauseInput.value);
-      if (!isNaN(newValue) && newValue >= 50 && newValue <= 2000) {
-        advancedSettings.minImmediateFixPause = newValue;
-        updateRestoreButton('minImmediateFixPause', elements.minImmediateFixPauseInput);
-      }
+    elements.minImmediateFixPauseInput.addEventListener('input', function() {
+      validateAndUpdateSetting(this, 'minImmediateFixPause');
       updateApplyAdvancedOptionsBtnState();
     });
-}
+    elements.minImmediateFixPauseInput.addEventListener('change', function() {
+      validateAndUpdateSetting(this, 'minImmediateFixPause');
+      updateApplyAdvancedOptionsBtnState();
+    });
+  }
   
   if (elements.maxImmediateFixPauseInput) {
-    elements.maxImmediateFixPauseInput.addEventListener('change', function() {
-      let newValue = parseInt(elements.maxImmediateFixPauseInput.value);
-      if (!isNaN(newValue) && newValue >= 50 && newValue <= 2000) {
-        advancedSettings.maxImmediateFixPause = newValue;
-        updateRestoreButton('maxImmediateFixPause', elements.maxImmediateFixPauseInput);
-      }
+    elements.maxImmediateFixPauseInput.addEventListener('input', function() {
+      validateAndUpdateSetting(this, 'maxImmediateFixPause');
       updateApplyAdvancedOptionsBtnState();
     });
-}
+    elements.maxImmediateFixPauseInput.addEventListener('change', function() {
+      validateAndUpdateSetting(this, 'maxImmediateFixPause');
+      updateApplyAdvancedOptionsBtnState();
+    });
+  }
   
   if (elements.minBetweenFixPauseInput) {
-    elements.minBetweenFixPauseInput.addEventListener('change', function() {
-      let newValue = parseInt(elements.minBetweenFixPauseInput.value);
-      if (!isNaN(newValue) && newValue >= 50 && newValue <= 2000) {
-        advancedSettings.minBetweenFixPause = newValue;
-        updateRestoreButton('minBetweenFixPause', elements.minBetweenFixPauseInput);
-      }
+    elements.minBetweenFixPauseInput.addEventListener('input', function() {
+      validateAndUpdateSetting(this, 'minBetweenFixPause');
       updateApplyAdvancedOptionsBtnState();
     });
-}
+    elements.minBetweenFixPauseInput.addEventListener('change', function() {
+      validateAndUpdateSetting(this, 'minBetweenFixPause');
+      updateApplyAdvancedOptionsBtnState();
+    });
+  }
   
   if (elements.maxBetweenFixPauseInput) {
-    elements.maxBetweenFixPauseInput.addEventListener('change', function() {
-      let newValue = parseInt(elements.maxBetweenFixPauseInput.value);
-      if (!isNaN(newValue) && newValue >= 50 && newValue <= 2000) {
-        advancedSettings.maxBetweenFixPause = newValue;
-        updateRestoreButton('maxBetweenFixPause', elements.maxBetweenFixPauseInput);
-      }
+    elements.maxBetweenFixPauseInput.addEventListener('input', function() {
+      validateAndUpdateSetting(this, 'maxBetweenFixPause');
       updateApplyAdvancedOptionsBtnState();
     });
-}
+    elements.maxBetweenFixPauseInput.addEventListener('change', function() {
+      validateAndUpdateSetting(this, 'maxBetweenFixPause');
+      updateApplyAdvancedOptionsBtnState();
+    });
+  }
   
   if (elements.allowWordNavigationInput) {
     elements.allowWordNavigationInput.addEventListener('change', function() {

@@ -176,11 +176,13 @@ opacity: 1;
       color: var(--primary-color);
 }
 
-    .modal-buttons {
+        .modal-buttons {
       display: flex;
       justify-content: space-between;
       margin-top: 20px;
-}
+      gap: 10px;
+      flex-wrap: wrap;
+    }
 
     .modal-btn {
       padding: 8px 15px;
@@ -193,10 +195,19 @@ opacity: 1;
       background-color: #e0e0e0;
 }
 
-    .modal-btn-apply {
+        .modal-btn-apply {
       background-color: var(--secondary-color);
       color: white;
-}
+    }
+
+    .modal-btn-restore {
+      background-color: #e74c3c;
+      color: white;
+    }
+
+    .modal-btn-restore:hover {
+      background-color: #c0392b;
+    }
 
     .modal-btn-apply:disabled,
     .modal-btn-apply.disabled {
@@ -365,6 +376,34 @@ color: white;
       width: 100%;
 min-height: 16px;
     }
+.input-container {
+  position: relative;
+}
+.input-error-tooltip {
+  display: none;
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translateX(-50%) translateY(-4px);
+  background: #fff0f0;
+  color: #c00;
+  border: 1px solid #c00;
+  border-radius: 4px;
+  font-size: 0.85em;
+  padding: 2px 8px;
+  max-width: 220px;
+  white-space: normal;
+  overflow-wrap: break-word;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+.input-invalid + .input-error-tooltip {
+  display: block;
+}
+.input-invalid {
+  border: 1.5px solid #c00 !important;
+  background: #fff0f0;
+}
   </style>
 </head>
 <body>
@@ -499,69 +538,64 @@ Shortcut Settings</button>
       
       <table class="advanced-table">
   
-      <tr>
-          <td title="Typing speed multiplier (higher = faster typing)">Typing Speed (%):</td>
-          <td><div class="input-container"><input type="number" id="advancedSpeedInput" min="10" max="200" value="100"></div></td>
+              <tr title="Typing speed multiplier (higher = faster typing)">
+          <td>Typing Speed (%):</td>
+          <td><div class="input-container"><input type="number" id="advancedSpeedInput"></div></td>
         </tr>
-        <tr>
-          <td title="Randomness of typing delays (higher = more variation in timing)">Randomness (%):</td>
-          <td><div class="input-container"><input type="number" id="advancedRandomnessInput" min="10" max="200" value="100"></div></td>
-      
-  </tr>
-        <tr>
-          <td title="Probability of making typing mistakes (0-20%)">Mistake Probability (%):</td>
-          <td><div class="input-container"><input type="number" id="advancedMistakeInput" min="0" max="20" value="3"></div></td>
+        <tr title="Randomness of typing delays (higher = more variation in timing)">
+          <td>Randomness (%):</td>
+          <td><div class="input-container"><input type="number" id="advancedRandomnessInput"></div></td>
         </tr>
-        <tr>
-          <td title="Percentage of mistakes fixed immediately vs. delayed">Immediate fix %:</td>
-          <td><div class="input-container"><input type="number" id="immediateFixPercentageInput" min="0" max="100" value="75"></div></td>
-     
-   </tr>
-        <tr>
-          <td title="Minimum characters typed before triggering review phase">Min chars before review:</td>
-          <td><div class="input-container"><input type="number" id="minCharsBeforeReviewInput" min="1" max="50" value="5"></div></td>
+        <tr title="Probability of making typing mistakes (0-20%)">
+          <td>Mistake Probability (%):</td>
+          <td><div class="input-container"><input type="number" id="advancedMistakeInput"></div></td>
         </tr>
-        <tr>
-          <td title="Maximum characters typed before triggering review phase">Max chars before review:</td>
-          <td><div class="input-container"><input type="number" id="maxCharsBeforeReviewInput" min="1" max="50" value="15"></div></td>
- 
-       </tr>
-        <tr>
-          <td title="Minimum pause duration before review phase (milliseconds)">Min review pause (ms):</td>
-          <td><div class="input-container"><input type="number" id="minReviewPauseInput" min="100" max="10000" value="1000"></div></td>
+        <tr title="Percentage of mistakes fixed immediately vs. delayed">
+          <td>Immediate fix %:</td>
+          <td><div class="input-container"><input type="number" id="immediateFixPercentageInput"></div></td>
         </tr>
-        <tr>
-          <td title="Maximum pause duration before review phase (milliseconds)">Max review pause (ms):</td>
-          <td><div class="input-container"><input type="number" 
-id="maxReviewPauseInput" min="100" max="10000" value="3000"></div></td>
+        <tr title="Minimum characters typed before triggering review phase">
+          <td>Min chars before review:</td>
+          <td><div class="input-container"><input type="number" id="minCharsBeforeReviewInput"></div></td>
         </tr>
-        <tr>
-          <td title="Minimum pause before immediate fix (milliseconds)">Min immediate fix pause (ms):</td>
-          <td><div class="input-container"><input type="number" id="minImmediateFixPauseInput" min="50" max="2000" value="100"></div></td>
+        <tr title="Maximum characters typed before triggering review phase">
+          <td>Max chars before review:</td>
+          <td><div class="input-container"><input type="number" id="maxCharsBeforeReviewInput"></div></td>
         </tr>
-        <tr>
-          <td title="Maximum pause before immediate fix (milliseconds)">Max immediate fix pause (ms):</td>
-         
- <td><div class="input-container"><input type="number" id="maxImmediateFixPauseInput" min="50" max="2000" value="400"></div></td>
+        <tr title="Minimum pause duration before review phase (milliseconds)">
+          <td>Min review pause (ms):</td>
+          <td><div class="input-container"><input type="number" id="minReviewPauseInput"></div></td>
         </tr>
-        <tr>
-          <td title="Minimum pause between fixes during review (milliseconds)">Min between fixes pause (ms):</td>
-          <td><div class="input-container"><input type="number" id="minBetweenFixPauseInput" min="50" max="2000" value="100"></div></td>
+        <tr title="Maximum pause duration before review phase (milliseconds)">
+          <td>Max review pause (ms):</td>
+          <td><div class="input-container"><input type="number" id="maxReviewPauseInput"></div></td>
         </tr>
-        <tr>
-          <td title="Maximum pause between fixes during review (milliseconds)">Max between fixes pause (ms):</td>
-   
-       <td><div class="input-container"><input type="number" id="maxBetweenFixPauseInput" min="50" max="2000" value="300"></div></td>
+        <tr title="Minimum pause before immediate fix (milliseconds)">
+          <td>Min immediate fix pause (ms):</td>
+          <td><div class="input-container"><input type="number" id="minImmediateFixPauseInput"></div></td>
         </tr>
-        <tr>
-          <td title="Allow using Ctrl+Arrow to jump word-by-word during navigation">Allow word navigation (control key):</td>
-          <td><div class="input-container"><input type="checkbox" id="allowWordNavigationInput" checked></div></td>
+        <tr title="Maximum pause before immediate fix (milliseconds)">
+          <td>Max immediate fix pause (ms):</td>
+          <td><div class="input-container"><input type="number" id="maxImmediateFixPauseInput"></div></td>
+        </tr>
+        <tr title="Minimum pause between fixes during review (milliseconds)">
+          <td>Min between fixes pause (ms):</td>
+          <td><div class="input-container"><input type="number" id="minBetweenFixPauseInput"></div></td>
+        </tr>
+        <tr title="Maximum pause between fixes during review (milliseconds)">
+          <td>Max between fixes pause (ms):</td>
+          <td><div class="input-container"><input type="number" id="maxBetweenFixPauseInput"></div></td>
+        </tr>
+        <tr title="Allow using Ctrl+Arrow to jump word-by-word during navigation">
+          <td>Allow word navigation (control key):</td>
+          <td><div class="input-container"><input type="checkbox" id="allowWordNavigationInput"></div></td>
         </tr>
       </table>
       
       <div class="modal-buttons">
         <button class="modal-btn modal-btn-cancel" id="cancelAdvancedOptionsBtn">Cancel</button>
         <button class="modal-btn modal-btn-apply" id="applyAdvancedOptionsBtn">Apply</button>
+        <button class="modal-btn modal-btn-restore" id="restoreDefaultsBtn" style="display: none;">Restore Defaults</button>
       </div>
     </div>
   </div>
